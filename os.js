@@ -426,32 +426,32 @@ function desenharOrg() {
   for (const c of C_LEVEL) {
     const dos = base.filter((i) => c.filas.includes(i.fila));
     const pressed = Array.isArray(F.fila) ? JSON.stringify(F.fila) === JSON.stringify(c.filas) : c.filas.length === 1 && F.fila === c.filas[0];
-    const ramo = el('div', 'org-ramo');
-    ramo.appendChild(caixa('', c.papel, c.nome, 'fila ' + c.filas.join(' + '), contagens(dos), pressed, () => alternar('fila', c.filas.length === 1 ? c.filas[0] : c.filas)));
-    if (c.papel === 'COO') {
-      ramo.appendChild(el('div', 'org-ligacao'));
-      const prods = el('div', 'org-filhos');
-      const nomes = [...(RETRATO.estrutura.produtos || []).map((p) => p.nome)];
-      if (base.some((i) => !i.produto)) nomes.push('— sem produto —');
-      for (const pn of nomes) {
-        const dosP = base.filter((i) => (i.produto || '— sem produto —') === pn);
-        const pr = el('div', 'org-ramo');
-        const pInfo = (RETRATO.estrutura.produtos || []).find((p) => p.nome === pn);
-        pr.appendChild(caixa('produto', 'Produto', pn, pInfo ? pInfo.empresa : 'itens sem produto', contagens(dosP), F.produto === pn, () => alternar('produto', pn)));
-        pr.appendChild(el('div', 'org-ligacao'));
-        const sq = el('div', 'org-filhos');
-        for (const s of (RETRATO.estrutura.squads || []).filter((s) => ['engenharia', 'operacoes'].includes(s.fila))) {
-          const dosS = dosP.filter((i) => i.fila === s.fila);
-          sq.appendChild(caixa('squad', 'Squad', s.nome, `WIP máx ${s.wip_max}`, contagens(dosS), F.produto === pn && F.fila === s.fila,
-            () => { const mesmo = F.produto === pn && F.fila === s.fila; if (mesmo) { delete F.produto; delete F.fila; } else { F.produto = pn; F.fila = s.fila; } render(); }));
-        }
-        pr.appendChild(sq); prods.appendChild(pr);
-      }
-      ramo.appendChild(prods);
-    }
-    nivelC.appendChild(ramo);
+    nivelC.appendChild(caixa(c.papel === 'COO' ? 'coo' : '', c.papel, c.nome, 'fila ' + c.filas.join(' + '), contagens(dos), pressed, () => alternar('fila', c.filas.length === 1 ? c.filas[0] : c.filas)));
   }
   org.appendChild(nivelC);
+
+  // Produtos e squads ficam sob o COO (Operations): um nível inteiro, para não
+  // espremer o organograma numa coluna só.
+  org.appendChild(el('div', 'org-ligacao'));
+  org.appendChild(el('div', 'org-rotulo', 'Produtos — sob o COO'));
+  const prods = el('div', 'org-nivel');
+  const nomes = [...(RETRATO.estrutura.produtos || []).map((p) => p.nome)];
+  if (base.some((i) => !i.produto)) nomes.push('— sem produto —');
+  for (const pn of nomes) {
+    const dosP = base.filter((i) => (i.produto || '— sem produto —') === pn);
+    const pr = el('div', 'org-ramo');
+    const pInfo = (RETRATO.estrutura.produtos || []).find((p) => p.nome === pn);
+    pr.appendChild(caixa('produto', 'Produto', pn, pInfo ? pInfo.empresa : 'itens sem produto', contagens(dosP), F.produto === pn, () => alternar('produto', pn)));
+    pr.appendChild(el('div', 'org-ligacao'));
+    const sq = el('div', 'org-filhos');
+    for (const s of (RETRATO.estrutura.squads || []).filter((s) => ['engenharia', 'operacoes'].includes(s.fila))) {
+      const dosS = dosP.filter((i) => i.fila === s.fila);
+      sq.appendChild(caixa('squad', 'Squad', s.nome, `WIP máx ${s.wip_max}`, contagens(dosS), F.produto === pn && F.fila === s.fila,
+        () => { const mesmo = F.produto === pn && F.fila === s.fila; if (mesmo) { delete F.produto; delete F.fila; } else { F.produto = pn; F.fila = s.fila; } render(); }));
+    }
+    pr.appendChild(sq); prods.appendChild(pr);
+  }
+  org.appendChild(prods);
 
   const lista = itens().filter(aberto).sort((a, b) => (pendente(b) - pendente(a)) || new Date(b.atualizado) - new Date(a.atualizado));
   const alvo = $('lista-filas'); alvo.replaceChildren();
