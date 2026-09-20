@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segurança da informação — FineApps Sistemas</title>
+<meta name="description" content="Práticas de segurança da informação adotadas pela FineApps Sistemas Ltda. nos produtos Stratum e Valora.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
+
+<header class="cabecalho">
+  <div class="envoltorio">
+    <a class="marca" href="index.html">FineApps <span>Sistemas</span></a>
+    <nav class="navegacao" aria-label="Principal">
+      <a href="index.html">Início</a>
+      <a href="privacidade.html">Privacidade</a>
+      <a href="direitos.html">Seus direitos</a>
+      <a href="seguranca.html" aria-current="page">Segurança</a>
+    </nav>
+  </div>
+</header>
+
+<main id="conteudo" class="documento-longo">
+  <div class="envoltorio coluna-texto">
+
+    <h1>Segurança da informação</h1>
+    <p class="vigencia">Atualizado em 20 de agosto de 2026</p>
+
+    <p>
+      Nossos produtos lidam com informação financeira. Esta página descreve, em linhas gerais, as
+      práticas que adotamos para protegê-la. É um resumo público: detalhes de arquitetura e de
+      configuração não são divulgados, por razões óbvias de segurança.
+    </p>
+    <p>
+      Clientes em processo de avaliação podem solicitar informação complementar pelo canal
+      <a class="email" href="mailto:privacidade@fineapps.com.br">privacidade@fineapps.com.br</a>.
+    </p>
+
+    <h2>Isolamento entre clientes</h2>
+    <p>
+      Cada cliente opera em ambiente logicamente segregado. O isolamento é aplicado no nível do
+      banco de dados, por políticas de acesso por registro, e verificado por testes automatizados
+      que tentam, deliberadamente, acessar dados de um cliente autenticado como outro — e que
+      precisam falhar em todos os caminhos.
+    </p>
+    <p>
+      No caso do Valora oferecido como benefício corporativo, existe uma segunda fronteira: os
+      dados financeiros pessoais do colaborador vivem fora do ambiente da empresa que custeia a
+      licença. O acesso pelo sistema da empresa se dá por federação de identidade, sem transporte
+      de dado financeiro.
+    </p>
+
+    <h2>Criptografia</h2>
+    <p>
+      Todo tráfego ocorre sobre conexões criptografadas. Os dados armazenados, incluindo as
+      cópias de segurança, são cifrados em repouso. Conexões ao banco de dados sem criptografia
+      são rejeitadas.
+    </p>
+
+    <h2>Controle de acesso</h2>
+    <p>
+      Adotamos o princípio do privilégio mínimo: cada pessoa recebe apenas o acesso necessário à
+      sua função, e ele é revogado quando deixa de ser necessário. As credenciais são individuais
+      e intransferíveis — não há conta compartilhada em nenhum sistema que alcance dado de cliente.
+    </p>
+    <p>
+      A autenticação em dois fatores é <strong>obrigatória e imposta pela plataforma</strong> em
+      todos os ambientes que hospedam dados. Acesso de nossa equipe a dados de cliente é
+      excepcional, condicionado a necessidade demonstrada e registrado.
+    </p>
+
+    <h2>Registro e auditoria</h2>
+    <p>
+      Operações sensíveis geram trilha de auditoria não editável pela aplicação. Registros de
+      conexão ao banco de dados são coletados para fins de auditoria, e registros de acesso à
+      aplicação são mantidos por seis meses, conforme o art. 15 do Marco Civil da Internet.
+    </p>
+
+    <h2>Uso dos dados</h2>
+    <p>
+      <strong>Não utilizamos os dados de um cliente para treinar, ajustar ou avaliar modelos que
+      beneficiem outro cliente.</strong> Todo aprendizado derivado dos dados de um cliente
+      permanece restrito ao ambiente dele. Essa vedação é contratual e estrutural — não é política
+      interna sujeita a revisão.
+    </p>
+
+    <h2>Decisão automatizada</h2>
+    <p>
+      No Stratum, nenhuma classificação contábil é efetivada sem aprovação humana. As sugestões
+      geradas pelo sistema são indicativas, apresentadas de forma distinta de dado confirmado, e
+      dependem de revisão por quem tem responsabilidade sobre a informação.
+    </p>
+    <p>
+      Quando o grau de confiança é insuficiente, o sistema se abstém de sugerir. É comportamento
+      projetado, não falha.
+    </p>
+
+    <h2>Fornecedores</h2>
+    <p>
+      Nenhum fornecedor que trate dados pessoais é contratado sem acordo de tratamento e sem
+      verificação de suas medidas de segurança. Trabalhamos com provedores que mantêm
+      certificações independentes reconhecidas de mercado, revistas anualmente.
+    </p>
+    <p>
+      Nossa infraestrutura de dados opera em território brasileiro. A relação de prestadores é
+      mantida atualizada e pode ser solicitada por clientes. A inclusão de novo fornecedor com
+      acesso a dados é comunicada aos clientes com trinta dias de antecedência.
+    </p>
+
+    <h2>Cópias de segurança</h2>
+    <p>
+      São feitas diariamente, de forma automatizada e cifrada, armazenadas separadamente do
+      ambiente de produção. A capacidade de restauração é verificada periodicamente.
+    </p>
+
+    <h2>Incidentes</h2>
+    <p>
+      Mantemos procedimento escrito de resposta a incidentes, com responsável designado, e o
+      exercitamos periodicamente. Havendo incidente de segurança com risco relevante:
+    </p>
+    <ul>
+      <li>Comunicamos os clientes empresariais em até <strong>48 horas</strong> do nosso conhecimento, para que possam cumprir seus próprios prazos regulatórios;</li>
+      <li>Quando somos os controladores, comunicamos os titulares e a Autoridade Nacional de Proteção de Dados nos prazos da regulamentação vigente.</li>
+    </ul>
+    <p>
+      Registramos todos os incidentes, inclusive os que não exigem comunicação, e mantemos esse
+      registro por cinco anos.
+    </p>
+
+    <h2>Ambientes e desenvolvimento</h2>
+    <p>
+      Desenvolvimento e produção são ambientes separados. <strong>Dados pessoais reais não são
+      utilizados em desenvolvimento ou teste.</strong> Alterações em produção passam por revisão
+      antes da publicação.
+    </p>
+
+    <h2>Encerramento</h2>
+    <p>
+      Encerrada a relação, os dados ficam disponíveis para exportação por prazo determinado em
+      contrato e depois são eliminados, incluindo as cópias de segurança. Emitimos declaração de
+      eliminação quando solicitada. Dados sujeitos a retenção legal são bloqueados — mantidos,
+      porém inacessíveis para qualquer outra finalidade.
+    </p>
+
+    <h2>Revisão</h2>
+    <p>
+      Nossa política interna de segurança é revista a cada seis meses, e imediatamente quando há
+      novo fornecedor, nova funcionalidade relevante, incidente ou alteração normativa aplicável.
+    </p>
+
+    <div class="caixa" style="margin-top:2.5rem;">
+      <p>
+        <strong>Encontrou uma vulnerabilidade?</strong> Escreva para
+        <a class="email" href="mailto:privacidade@fineapps.com.br">privacidade@fineapps.com.br</a>
+        com a descrição e os passos para reproduzir. Comprometemo-nos a responder e a não adotar
+        medida contra quem reportar de boa-fé, sem explorar o problema além do necessário para
+        demonstrá-lo e sem acessar dados de terceiros.
+      </p>
+    </div>
+
+  </div>
+</main>
+
+<footer class="rodape">
+  <div class="envoltorio">
+    <p><strong>FineApps Sistemas Ltda.</strong> · CNPJ 27.340.695/0001-07</p>
+    <p>Av. Caetano Gornati, 1101, casa 327 — Jundiaí/SP — 13214-661</p>
+    <p class="aviso-legal">
+      © 2026 FineApps Sistemas Ltda. ·
+      <a href="index.html">Início</a> ·
+      <a href="privacidade.html">Privacidade</a> ·
+      <a href="direitos.html">Seus direitos</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

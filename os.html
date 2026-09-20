@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Command Center — FineApps</title>
+<link rel="stylesheet" href="os.css">
+</head>
+<body class="os">
+
+<!-- ENTRADA -->
+<section id="entrada" class="entrada">
+  <div class="entrada-cartao">
+    <div class="entrada-marca">FineApps <span>Command Center</span></div>
+    <p class="entrada-sub">Área interna. Entre com a sua conta.</p>
+    <form id="form-login" autocomplete="on">
+      <label for="email">E-mail</label>
+      <input id="email" name="email" type="email" autocomplete="username" required>
+      <label for="senha">Senha</label>
+      <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+      <button type="submit" id="btn-entrar" class="btn">Entrar</button>
+      <p class="aviso" id="erro-login" role="alert" hidden></p>
+    </form>
+  </div>
+</section>
+
+<!-- APLICAÇÃO -->
+<div id="app" class="app" hidden>
+
+  <header class="topo">
+    <div class="topo-marca">FineApps <span>Command Center</span></div>
+    <nav class="abas" id="abas" aria-label="Abas">
+      <button data-aba="cc" aria-selected="true">Command Center</button>
+      <button data-aba="pedido">Novo pedido</button>
+      <button data-aba="monitor">Monitor <span class="pill" id="pill-monitor" hidden></span></button>
+      <button data-aba="custos">Custos</button>
+      <button data-aba="report">Report</button>
+    </nav>
+    <div class="topo-direita">
+      <span class="quem" id="quem"></span>
+      <button id="atualizar" class="btn-texto" title="Atualizar agora">Atualizar</button>
+      <button id="sair" class="btn-texto">Sair</button>
+    </div>
+  </header>
+
+  <div class="filtros" id="filtros">
+    <div class="filtro-grupo">
+      <label for="f-empresa">Empresa</label>
+      <select id="f-empresa"><option value="">Todas</option></select>
+    </div>
+    <div class="filtro-grupo">
+      <label for="f-produto">Produto</label>
+      <select id="f-produto"><option value="">Todos</option></select>
+    </div>
+    <div class="chips" id="chips"></div>
+    <button id="limpar" class="btn-texto" hidden>Limpar filtros</button>
+    <span class="carimbo" id="carimbo"></span>
+  </div>
+
+  <main class="conteudo">
+
+    <!-- ABA 1: COMMAND CENTER -->
+    <section class="aba" data-aba="cc">
+      <nav class="subabas" id="subabas" aria-label="Seções do Command Center">
+        <button data-sub="aprov" aria-selected="true">Aprovações pendentes <span class="pill" id="pill-aprov">0</span></button>
+        <button data-sub="status">Status</button>
+        <button data-sub="filas">Filas</button>
+        <button data-sub="paths">Paths</button>
+      </nav>
+
+      <div class="sub" data-sub="aprov">
+        <p class="sub-texto" id="sub-aprov"></p>
+        <div class="lista" id="lista-aprov"></div>
+      </div>
+
+      <div class="sub" data-sub="status" hidden>
+        <div class="faixa-executor" id="faixa-executor"></div>
+        <div class="badges" id="badges-status"></div>
+        <div class="lista" id="lista-status"></div>
+      </div>
+
+      <div class="sub" data-sub="filas" hidden>
+        <p class="sub-texto">Organograma ao vivo. O número é o que está em aberto; o vermelho é o que está parado. Clique numa caixa para ver o que há nela.</p>
+        <div class="org" id="org"></div>
+        <div class="lista" id="lista-filas"></div>
+      </div>
+
+      <div class="sub" data-sub="paths" hidden>
+        <p class="sub-texto">Caminho esperado: <span class="cam-esperado" id="cam-esperado"></span>. Cada tarefa mostra o que percorreu; desvios em âmbar, perna não classificada em vermelho.</p>
+        <div class="badges" id="badges-paths"></div>
+        <h3>Em aberto</h3>
+        <div class="lista" id="paths-abertos"></div>
+        <h3>Fechados</h3>
+        <div class="lista" id="paths-fechados"></div>
+      </div>
+    </section>
+
+    <!-- ABA 2: NOVO PEDIDO -->
+    <section class="aba" data-aba="pedido" hidden>
+      <div class="painel-form">
+        <h2>Novo pedido</h2>
+        <p class="sub-texto">Entra assinado por você, é triado e roteado sozinho. Você recebe o retorno por e-mail quando concluir.</p>
+        <form id="form-pedido">
+          <div class="grade-2">
+            <div>
+              <label for="p-empresa">Empresa</label>
+              <select id="p-empresa" required></select>
+            </div>
+            <div>
+              <label for="p-produto">Produto</label>
+              <select id="p-produto"><option value="">— nenhum (é da empresa) —</option></select>
+            </div>
+          </div>
+          <label for="p-titulo">Título</label>
+          <input id="p-titulo" type="text" minlength="10" required placeholder="O que precisa acontecer">
+          <label for="p-desc">Descrição</label>
+          <textarea id="p-desc" rows="6" minlength="30" required placeholder="Quem vai executar não estava na conversa em que isto fez sentido. Escreva o suficiente para agir sem perguntar. Termine com o critério de aceite."></textarea>
+          <div class="grade-2">
+            <div>
+              <label for="p-prio">Prioridade</label>
+              <select id="p-prio">
+                <option value="critica">Crítica</option>
+                <option value="alta">Alta</option>
+                <option value="media" selected>Média</option>
+                <option value="baixa">Baixa</option>
+              </select>
+            </div>
+            <div class="alinha-fim"><button type="submit" id="btn-pedido" class="btn">Abrir pedido</button></div>
+          </div>
+          <p class="aviso" id="msg-pedido" role="status" hidden></p>
+        </form>
+      </div>
+      <h3>Seus pedidos recentes</h3>
+      <div class="lista" id="meus-pedidos"></div>
+    </section>
+
+    <!-- ABA 3: MONITOR -->
+    <section class="aba" data-aba="monitor" hidden>
+      <div class="kpis" id="kpis-monitor"></div>
+      <div class="grade-2 topo-espaco">
+        <div>
+          <h3>Réguas <span class="sub-inline" id="sub-reguas"></span></h3>
+          <div class="reguas" id="reguas"></div>
+        </div>
+        <div>
+          <h3>Executor</h3>
+          <div class="linhas" id="mon-executor"></div>
+          <h3>Desvios nos últimos 7 dias</h3>
+          <div class="linhas" id="mon-desvios"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 4: CUSTOS -->
+    <section class="aba" data-aba="custos" hidden>
+      <div class="kpis" id="kpis-custos"></div>
+      <div class="grade-2 topo-espaco">
+        <div>
+          <h3>Por fila</h3>
+          <table class="tabela" id="custos-filas"></table>
+          <h3>Teto semanal</h3>
+          <div class="painel-teto" id="painel-teto"></div>
+        </div>
+        <div>
+          <h3>Lançamentos <span class="sub-inline" id="sub-lanc"></span></h3>
+          <table class="tabela" id="lancamentos"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 5: REPORT -->
+    <section class="aba" data-aba="report" hidden>
+      <div class="report-filtros">
+        <div><label for="r-de">De</label><input type="date" id="r-de"></div>
+        <div><label for="r-ate">Até</label><input type="date" id="r-ate"></div>
+        <div><label for="r-fila">Fila</label><select id="r-fila"><option value="">Todas</option></select></div>
+        <div><label for="r-quem">Quem abriu</label><select id="r-quem"><option value="">Todos</option></select></div>
+        <div><label for="r-nat">Natureza</label><select id="r-nat"><option value="">Todas</option><option value="técnico">Técnico</option><option value="negócio">Negócio</option></select></div>
+        <div><label for="r-base">Data-base</label><select id="r-base"><option value="criado">Abertura</option><option value="atualizado">Última mudança</option><option value="concluido">Conclusão</option></select></div>
+      </div>
+      <div class="kpis" id="kpis-report"></div>
+      <table class="tabela" id="tabela-report"></table>
+    </section>
+
+  </main>
+
+  <footer class="rodape">FineApps Sistemas Ltda. — área interna, não indexada. Os números vêm do banco; a tela não calcula nada sozinha.</footer>
+</div>
+
+<script src="os.js"></script>
+</body>
+</html>
