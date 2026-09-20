@@ -13,3 +13,9 @@ Regras da tela:
 
 Vocabulário: Empresa (não "casa"), Executor (não "oficina"), Aprovações (não "mesa"),
 Em execução (não "plantão"), Triagem (não "Council"), Monitor/réguas (não "vigilância/invariantes").
+
+## Publicação (desde 20/09/2026)
+
+O site vive no repositório **github.com/renatocorrea2908/fineapps-site**, ligado ao projeto
+`fineapps-site` da Vercel: **um push em `main` publica**. O deploy manual pela CLI deixa de ser o caminho.
+Esta pasta (`~/Claude/Dev/FineApps/site`) é um clone do repositório.
