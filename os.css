@@ -251,3 +251,7 @@ pre { font: .78rem/1.45 var(--mono); background: var(--papel-2); padding: .6rem 
   .conteudo { padding: 1rem; }
   .carimbo { margin-left: 0; }
 }
+
+/* rampas (M394/M396) */
+.painel-teto .luz { width: .6rem; height: .6rem; border-radius: 50%; display: inline-block; margin-right: .4rem; background: var(--tinta-3); vertical-align: middle; }
+.painel-teto .luz.on { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-fundo); }

@@ -315,7 +315,7 @@ function desenharAprov() {
     const cx = el('article', 'item espera');
     cx.appendChild(el('h4', null, p.titulo));
     const m = el('div', 'meta');
-    m.appendChild(el('span', 'estado', ROTULO_CLASSE[p.classe] || p.classe));
+    m.appendChild(el('span', 'estado', (p.classe === 'travado' && p.contexto && p.contexto.escalado_pelo_cto) ? 'escalado pelo CTO — precisa da sua decisão' : (ROTULO_CLASSE[p.classe] || p.classe)));
     m.appendChild(el('span', null, `${p.dias_esperando} dia(s) esperando`));
     if (i) m.append(tag(i.empresa, 'empresa', i.empresa), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'), tag('fila ' + i.fila, 'fila', i.fila), tag(i.natureza, 'natureza', i.natureza));
     m.appendChild(el('span', null, `impacto ${p.impacto || '—'}`));
@@ -552,6 +552,8 @@ function desenharMonitor() {
   kpi(k, 'Esperando a vez', num((p.na_fila || []).length), (p.na_fila || []).some((i) => i.ultima_falha) ? 'há item que já falhou' : 'na fila', '', () => { ABA = 'cc'; SUB = 'status'; F.estado = 'ready'; mostrarAba(); render(); });
   kpi(k, 'Parados há mais de 2h', num(parados), 'sem executor, sem despacho', parados ? 'atencao' : 'ok');
   kpi(k, 'Pedidos sem triagem', num(semTriagem), 'há mais de 2h', semTriagem ? 'atencao' : 'ok');
+  const os29 = inv.find((i) => i.id === 'OS29'); const rampaParada = (os29 && os29.detalhes && os29.detalhes.parados || []).length;
+  kpi(k, 'Rampa 7b parada', num(rampaParada), 'técnico há mais de 2h sem CI/CTO', rampaParada ? 'atencao' : 'ok');
   kpi(k, 'Último despacho', p.ultimo_despacho ? hhmm(p.ultimo_despacho) : '—', p.ultimo_despacho ? dia(p.ultimo_despacho) : 'o banco ainda não acordou o executor');
 
   $('sub-reguas').textContent = vig.vermelhos.length === 0 ? 'todas verdes — o CI lê estas mesmas réguas contra a produção a cada push' : `${vig.vermelhos.length} vermelha(s): os números do painel podem não valer nada até ficarem verdes`;
@@ -563,6 +565,7 @@ function desenharMonitor() {
     if (!i.passou) { const dt = el('details'); dt.append(el('summary', null, 'detalhes'), el('pre', null, JSON.stringify(i.detalhes, null, 2))); t.appendChild(dt); }
     d.appendChild(t); rg.appendChild(d);
   }
+  desenharRampas();
   linhas($('mon-executor'), (p.despachos || []).slice(0, 10).map((d) => [
     `${d.evento === 'company-os-liberado' ? 'executor acordado' : d.evento === 'company-os-entrega-aceita' ? 'conclusão acordada' : d.evento === 'company-os-pedido-novo' ? 'triagem acordada' : d.evento} · ${d.titulo || ''}`.trim(),
     `${quando(d.quando)}${d.enviado ? '' : ' · NÃO enviado'}`]));
@@ -571,6 +574,23 @@ function desenharMonitor() {
   pares.push(['passos no caminho / total', `${num(dv.passos && dv.passos.no_caminho)} / ${num(dv.passos && dv.passos.total)}`]);
   pares.push(['itens com desvio', num(dv.itens && dv.itens.com_desvio)]);
   linhas($('mon-desvios'), pares);
+}
+
+const RAMPAS_TEXTO = { '7b': ['7b — tema técnico não volta ao CEO', 'Ligada: entrega técnica com CI verde é aceita pela régua e vai a produção; item técnico travado é decidido pelo CTO (devolver, cancelar ou escalar a você com motivo de negócio). Desligada: tudo volta a esperar o seu aceite, como na 7a.'] };
+function desenharRampas() {
+  const pr = $('painel-rampas'); if (!pr) return; pr.replaceChildren();
+  const rampas = (RETRATO.estrutura && RETRATO.estrutura.rampas) || [];
+  if (!rampas.length) { pr.appendChild(el('p', 'motivo', 'Nenhuma rampa declarada.')); return; }
+  for (const r of rampas) {
+    const [tit, expl] = RAMPAS_TEXTO[r.nome] || [r.nome, ''];
+    const cab = el('div', 'atual'); const luz = el('span', 'luz' + (r.ligada ? ' on' : '')); cab.append(luz, document.createTextNode(`${tit}: ${r.ligada ? 'LIGADA' : 'desligada'}`));
+    pr.append(cab, el('p', 'motivo', expl), el('p', 'motivo', `${r.motivo} — ${quando(r.mudada_em)}`));
+    const form = el('div', 'acao-caixa');
+    const motivo = el('input'); motivo.type = 'text'; motivo.placeholder = (r.ligada ? 'Por que desligar' : 'Por que ligar') + ' (mínimo 10 letras)';
+    const b = el('button', 'btn ' + (r.ligada ? 'perigo' : 'sec'), r.ligada ? 'Desligar rampa' : 'Ligar rampa'); const msg = el('p', 'aviso'); msg.hidden = true;
+    b.addEventListener('click', async () => { b.disabled = true; try { await rpc('company_os_ligar_rampa', { p_nome: r.nome, p_ligada: !r.ligada, p_motivo: motivo.value.trim() }); await abrirCasa(); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
+    form.append(motivo, b, msg); pr.appendChild(form);
+  }
 }
 
 /* ── ABA Custos ───────────────────────────────────────────────────────────── */
