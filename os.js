@@ -417,9 +417,14 @@ function desenharOrg() {
   const base = todosItens().filter(passa);
   Object.assign(F, Object.fromEntries(Object.entries(guardados).filter(([, v]) => v !== undefined)));
 
-  const ceoN = { abertos: base.filter((i) => aberto(i) && i.fila === 'executiva').length, parados: base.filter((i) => aberto(i) && pendente(i)).length, exec: 0 };
-  const ceo = caixa('ceo', 'CEO', 'Renato Correa', 'alçada executiva · fila executiva', ceoN, F.pendente === true, () => alternar('pendente', true));
-  ceo.querySelector('.selos .pill').title = 'na fila executiva'; ceo.querySelector('.selos .pill').className = 'pill';
+  /* A caixa do CEO mostra SÓ o que espera por ele. A fila executiva é do
+     executor (squad mesa-do-ceo) — em 20/09 o "3" ali foi lido como "3 para
+     aprovar" quando eram 3 itens já aprovados esperando execução. */
+  const paradosEmMim = base.filter((i) => aberto(i) && pendente(i)).length;
+  const naExecutiva = base.filter((i) => aberto(i) && i.fila === 'executiva').length;
+  const ceo = caixa('ceo', 'CEO', 'Renato Correa', `${naExecutiva} na fila executiva (o executor faz)`, { abertos: paradosEmMim, parados: 0, exec: 0 }, F.pendente === true, () => alternar('pendente', true));
+  const selo = ceo.querySelector('.selos .pill'); selo.className = 'pill' + (paradosEmMim ? ' vermelho' : ''); selo.title = 'parados em você (Aprovações)';
+  selo.textContent = paradosEmMim ? `${paradosEmMim} para você` : 'nada para você';
   org.append(el('div', 'org-nivel').appendChild(ceo).parentElement, el('div', 'org-ligacao'));
 
   const nivelC = el('div', 'org-nivel');
