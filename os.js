@@ -309,8 +309,8 @@ function desenharAprov() {
     ? (total ? 'Nada com os filtros atuais.' : 'Nada espera por você. A fila anda sozinha.')
     : `${lista.length} item(ns) não andam até você decidir. Em ordem de quem espera há mais tempo.`;
   const alvo = $('lista-aprov'); alvo.replaceChildren();
-  if (!lista.length) { alvo.appendChild(el('p', 'vazio', 'Aprovações limpas.')); return; }
-  for (const p of lista) {
+  if (!lista.length) alvo.appendChild(el('p', 'vazio', 'Aprovações limpas.'));
+  for (const p of (lista.length ? lista : [])) {
     const i = porId.get(p.id);
     const cx = el('article', 'item espera');
     cx.appendChild(el('h4', null, p.titulo));
@@ -335,6 +335,20 @@ function desenharAprov() {
       'O que mudou (para devolver) ou por que encerrar (para cancelar) — mínimo 10 letras'));
     if (p.classe === 'deliberacao_escalada') cx.appendChild(el('p', 'porque', 'Deliberação escalada: a decisão é registrada pela Triagem com a sua palavra. Escreva a decisão num pedido novo ou fale com o executor.'));
     alvo.appendChild(cx);
+  }
+  // Só para você saber: o que a régua (CI) aceitou nos últimos 7 dias — informação, não pendência (M397)
+  const regua = ((RETRATO.estrutura && RETRATO.estrutura.entregas_da_regua) || []).filter((e) => (!F.empresa || e.empresa === F.empresa) && (!F.produto || (e.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, e.fila)));
+  if (regua.length) {
+    alvo.appendChild(el('h3', 'info-titulo', `Entregue pela régua nos últimos 7 dias — só para você saber (${regua.length})`));
+    for (const e of regua) {
+      const cx = el('article', 'item info');
+      cx.appendChild(el('h4', null, e.titulo));
+      const m = el('div', 'meta');
+      m.append(el('span', 'estado', e.concluida ? 'em produção' : 'aceita pelo CI — concluindo'), el('span', null, quando(e.aceita_em)), tag(e.empresa, 'empresa', e.empresa), tag(e.produto || 'sem produto', 'produto', e.produto || '— sem produto —'), tag('fila ' + e.fila, 'fila', e.fila), el('span', null, e.alcada === 'technical' || e.alcada === 'none' ? 'técnico (7b)' : 'aprovado por você na entrada (7c)'));
+      cx.appendChild(m);
+      if (/^https?:\/\//.test(e.referencia || '')) { const a = el('a', 'ligacao', 'Ver a entrega (PR)'); a.href = e.referencia; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
+      alvo.appendChild(cx);
+    }
   }
 }
 function caixaAcao(p, botoes, placeholder) {
