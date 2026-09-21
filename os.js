@@ -609,68 +609,76 @@ function desenharRampas() {
 
 /* ── ABA Custos ───────────────────────────────────────────────────────────── */
 function desenharCustos() {
-  const c = RETRATO.custos || {};
-  const filtrado = !!(F.empresa || F.produto || F.fila || F.natureza);
-  const lanc = (c.lancamentos || []).filter((l) => (!F.empresa || l.empresa === F.empresa) && (!F.produto || (l.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, l.fila)));
-  const semana = new Date(c.semana_inicio);
-  const gastoSemana = filtrado ? lanc.filter((l) => new Date(l.quando) >= semana).reduce((s, l) => s + Number(l.valor), 0) : Number(c.gasto_semana || 0);
-  const abertosF = itens().filter(aberto);
-  const reservado = filtrado ? abertosF.reduce((s, i) => s + Math.max(Number(i.orcamento || 0) - Number(i.gasto || 0), 0), 0) : Number(c.reservado || 0);
-  const teto = c.teto_semanal ? Number(c.teto_semanal.valor) : null;
-  const livre = teto == null ? null : teto - gastoSemana - reservado;
+  const c = RETRATO.custos || {}; const cu = c.custeio || {};
+  const filtrado = !!(F.empresa || F.produto || F.fila);
+  const passaC = (i) => (!F.empresa || i.empresa === F.empresa) && (!F.produto || (i.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, i.fila));
+  const itensC = (cu.itens || []).filter(passaC);
+  const realF = itensC.reduce((s, i) => s + Number(i.custo_real || 0), 0);
+  const consumoF = itensC.reduce((s, i) => s + Number(i.consumo || 0), 0);
+  const minutosF = itensC.reduce((s, i) => s + Number(i.minutos || 0), 0);
+  const ac = cu.actions || {};
   const k = $('kpis-custos'); k.replaceChildren();
-  kpi(k, 'Teto semanal', teto == null ? 'não declarado' : moeda(teto), teto == null ? 'declare abaixo' : `desde ${dia(c.teto_semanal.declarado_em)}`, teto == null ? 'alerta' : '');
-  kpi(k, 'Gasto na semana' + (filtrado ? ' (filtro)' : ''), moeda(gastoSemana), `semana de ${dia(c.semana_inicio)}`, teto != null && gastoSemana > teto ? 'atencao' : '');
-  kpi(k, 'Reservado nas filas', moeda(reservado), `orçamento de ${num(abertosF.filter((i) => i.orcamento != null).length)} item(ns) abertos, ainda não gasto`);
-  kpi(k, 'Livre', livre == null ? '—' : moeda(livre), livre == null ? 'sem teto não há "livre"' : 'teto − gasto − reservado', livre != null && livre < 0 ? 'atencao' : livre != null ? 'ok' : '');
-  kpi(k, 'Abertos sem teto próprio', num(filtrado ? abertosF.filter((i) => i.orcamento == null).length : c.abertos_sem_teto), 'item sem orçamento declarado', Number(c.abertos_sem_teto) ? 'alerta' : '');
-  kpi(k, 'Parado esperando você', moeda(c.gasto_parado_esperando_voce), 'já gasto em itens travados');
-  kpi(k, 'Gasto total (tudo)', moeda(c.gasto_total_casa), 'desde o início');
+  kpi(k, 'Custo fixo do mês', moeda(cu.fixos_brl), `${(cu.fixos || []).length} contratos · câmbio ${Number(cu.cambio || 0).toFixed(2)}`);
+  kpi(k, 'GitHub Actions no mês', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min além da franquia = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
+  kpi(k, 'Custo real do mês', moeda(cu.custo_real_total), cu.provisorio ? 'fixos + excedente · provisório até o mês fechar' : 'mês fechado');
+  kpi(k, 'Rateado nos itens' + (filtrado ? ' (filtro)' : ''), moeda(realF), `${num(itensC.length)} tarefa(s) · ${num(cu.rodadas)} rodadas no mês`);
+  kpi(k, 'Consumo (chave de rateio)' + (filtrado ? ' (filtro)' : ''), moeda(consumoF), 'valor de tabela dos tokens — não é cobrança');
+  kpi(k, 'Custo médio por tarefa', itensC.length ? moeda(realF / itensC.length) : '—', 'do custo real rateado');
+  kpi(k, 'Parado esperando você', moeda(c.gasto_parado_esperando_voce), 'consumo já feito em itens travados');
 
-  // por fila
+  // custo real por tarefa
+  $('sub-custeio').textContent = `${dia(cu.mes)} · ${num(itensC.length)} tarefa(s)${filtrado ? ' (com filtro)' : ''}`;
+  const ti = $('custeio-itens'); ti.replaceChildren();
+  const cabI = el('tr'); for (const [h, n] of [['Tarefa', 0], ['Fila', 0], ['Empresa / produto', 0], ['Rodadas', 1], ['Fatia', 1], ['Fixos rateados', 1], ['Actions', 1], ['Custo real', 1]]) cabI.appendChild(el('th', n ? 'n' : '', h)); ti.appendChild(cabI);
+  for (const i of itensC.slice(0, 40)) {
+    const r = el('tr');
+    const tdF = el('td'); tdF.appendChild(tag(i.fila, 'fila', i.fila));
+    const tdE = el('td'); tdE.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'));
+    r.append(el('td', null, i.titulo), tdF, tdE, el('td', 'n', num(i.rodadas)), el('td', 'n', `${Number(i.fatia).toFixed(1)}%`), el('td', 'n', moeda(i.fixos_rateados)), el('td', 'n', moeda(i.actions_brl)), el('td', 'n', moeda(i.custo_real)));
+    ti.appendChild(r);
+  }
+  const totI = el('tr', 'total'); const tdtI = el('td', null, `Total: ${num(itensC.length)} tarefa(s)`); tdtI.colSpan = 5;
+  totI.append(tdtI, el('td', 'n', moeda(itensC.reduce((s, i) => s + Number(i.fixos_rateados || 0), 0))), el('td', 'n', moeda(itensC.reduce((s, i) => s + Number(i.actions_brl || 0), 0))), el('td', 'n', moeda(realF))); ti.appendChild(totI);
+
+  // por fila (custo real)
   const filas = (RETRATO.estrutura.filas || []).map((f) => f.nome);
   const t = $('custos-filas'); t.replaceChildren();
-  const cab = el('tr'); for (const [h, n] of [['Fila', 0], ['Gasto na semana', 1], ['Reservado', 1], ['Abertos', 1], ['Sem teto', 1]]) cab.appendChild(el('th', n ? 'n' : '', h)); t.appendChild(cab);
-  let tg = 0, tr = 0;
+  const cab = el('tr'); for (const [h, n] of [['Fila', 0], ['Tarefas', 1], ['Rodadas', 1], ['Consumo', 1], ['Custo real', 1]]) cab.appendChild(el('th', n ? 'n' : '', h)); t.appendChild(cab);
   for (const f of filas) {
-    const dos = abertosF.filter((i) => i.fila === f);
-    const g = filtrado ? lanc.filter((l) => l.fila === f && new Date(l.quando) >= semana).reduce((s, l) => s + Number(l.valor), 0) : Number((c.gasto_semana_por_fila || {})[f] || 0);
-    const r = filtrado ? dos.reduce((s, i) => s + Math.max(Number(i.orcamento || 0) - Number(i.gasto || 0), 0), 0) : Number((c.reservado_por_fila || {})[f] || 0);
-    tg += g; tr += r;
+    const dos = itensC.filter((i) => i.fila === f); if (!dos.length && F.fila && !bate(F.fila, f)) continue;
     const l = el('tr', 'clicavel'); if (bate(F.fila, f)) l.style.background = 'var(--marca-tinta)';
-    l.append(el('td', null, f), el('td', 'n', moeda(g)), el('td', 'n', moeda(r)), el('td', 'n', num(dos.length)), el('td', 'n', num(dos.filter((i) => i.orcamento == null).length)));
+    l.append(el('td', null, f), el('td', 'n', num(dos.length)), el('td', 'n', num(dos.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.consumo || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.custo_real || 0), 0))));
     l.addEventListener('click', () => alternar('fila', f)); t.appendChild(l);
   }
-  const tot = el('tr', 'total'); tot.append(el('td', null, 'Total'), el('td', 'n', moeda(tg)), el('td', 'n', moeda(tr)), el('td', 'n', num(abertosF.length)), el('td', 'n', num(abertosF.filter((i) => i.orcamento == null).length))); t.appendChild(tot);
+  const tot = el('tr', 'total'); tot.append(el('td', null, 'Total'), el('td', 'n', num(itensC.length)), el('td', 'n', num(itensC.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(consumoF)), el('td', 'n', moeda(realF))); t.appendChild(tot);
 
-  // teto
-  const pt = $('painel-teto'); pt.replaceChildren();
-  if (c.teto_semanal) {
-    pt.append(el('div', 'atual', moeda(c.teto_semanal.valor) + ' por semana'), el('p', 'motivo', `${c.teto_semanal.motivo} — declarado em ${quando(c.teto_semanal.declarado_em)}`));
-    const barra = el('div', 'barra'); const total = Math.max(teto, gastoSemana + reservado, 1);
-    const g = el('span', 'gasto'); g.style.width = `${Math.min(100, gastoSemana / total * 100)}%`; const r = el('span', 'reservado'); r.style.width = `${Math.min(100, reservado / total * 100)}%`;
-    barra.append(g, r); pt.appendChild(barra);
-    const lg = el('div', 'legenda'); for (const [cls, rot] of [['gasto', 'gasto'], ['reservado', 'reservado'], ['', 'livre']]) { const s = el('span'); const i = el('i'); i.style.background = cls === 'gasto' ? 'var(--marca)' : cls === 'reservado' ? '#8fa8d3' : 'var(--papel-3)'; s.append(i, document.createTextNode(rot)); lg.appendChild(s); } pt.appendChild(lg);
-  } else pt.appendChild(el('p', 'motivo', 'Nenhum teto semanal declarado. O executor registra o custo de cada rodada; sem teto, não há "livre".'));
+  // custos fixos (declaração executiva)
+  const pf = $('painel-fixos'); pf.replaceChildren();
+  for (const f of (cu.fixos || [])) {
+    const linha = el('div', 'atual'); linha.textContent = `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toFixed(2) + ' = ' : ''}${moeda(f.valor_brl)}/mês`;
+    pf.append(linha, el('p', 'motivo', f.motivo));
+  }
+  pf.appendChild(el('p', 'motivo', `Total: ${moeda(cu.fixos_brl)}/mês. Actions: US$ ${Number(ac.preco_minuto_usd || 0).toFixed(3)}/min além de ${num(ac.franquia)} min. Só os minutos das rodadas do executor entram por tarefa; CI de PR e vigias ficam fora.`));
   const form = el('div', 'acao-caixa');
-  const valor = el('input'); valor.type = 'number'; valor.min = '1'; valor.step = '0.01'; valor.placeholder = 'Novo teto (R$/semana)'; valor.style.flex = '0 0 11rem';
-  const motivo = el('input'); motivo.type = 'text'; motivo.placeholder = 'Motivo (mínimo 10 letras) — ex.: plano Max 20x, R$ ~250/semana';
-  const b = el('button', 'btn sec', 'Declarar teto'); const msg = el('p', 'aviso'); msg.hidden = true;
-  b.addEventListener('click', async () => { b.disabled = true; try { await rpc('company_os_declarar_teto', { p_valor: Number(valor.value), p_motivo: motivo.value.trim() }); await abrirCasa(); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
-  form.append(valor, motivo, b, msg); pt.appendChild(form);
+  const item = el('input'); item.type = 'text'; item.placeholder = 'Contrato (ex.: Vercel Pro)'; item.style.flex = '0 0 11rem';
+  const valor = el('input'); valor.type = 'number'; valor.min = '0'; valor.step = '0.01'; valor.placeholder = 'Valor/mês'; valor.style.flex = '0 0 7rem';
+  const moedaSel = el('select'); for (const m of ['BRL', 'USD']) { const o = el('option', null, m); o.value = m; moedaSel.appendChild(o); } moedaSel.style.flex = '0 0 5rem';
+  const motivo = el('input'); motivo.type = 'text'; motivo.placeholder = 'Motivo (mínimo 10 letras) — valor 0 tira do rateio';
+  const b = el('button', 'btn sec', 'Declarar custo fixo'); const msg = el('p', 'aviso'); msg.hidden = true;
+  b.addEventListener('click', async () => { b.disabled = true; try { await rpc('company_os_declarar_custo_fixo', { p_item: item.value.trim(), p_valor: Number(valor.value), p_moeda: moedaSel.value, p_motivo: motivo.value.trim() }); await abrirCasa(); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
+  form.append(item, valor, moedaSel, motivo, b, msg); pf.appendChild(form);
 
-  // lançamentos
+  // rodadas recentes
+  const lanc = (c.lancamentos || []).filter((l) => (!F.empresa || l.empresa === F.empresa) && (!F.produto || (l.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, l.fila)));
   $('sub-lanc').textContent = `${lanc.length} mais recentes${filtrado ? ' (com filtro)' : ''}`;
   const tl = $('lancamentos'); tl.replaceChildren();
-  const cb = el('tr'); for (const [h, n] of [['Quando', 0], ['Item', 0], ['Fila', 0], ['Empresa / produto', 0], ['Natureza', 0], ['Executor', 0], ['Valor', 1]]) cb.appendChild(el('th', n ? 'n' : '', h)); tl.appendChild(cb);
+  const cb = el('tr'); for (const [h, n] of [['Quando', 0], ['Item', 0], ['Fila', 0], ['Executor', 0], ['Minutos', 1], ['Consumo', 1]]) cb.appendChild(el('th', n ? 'n' : '', h)); tl.appendChild(cb);
   for (const l of lanc) {
     const r = el('tr');
     const tdF = el('td'); tdF.appendChild(tag(l.fila, 'fila', l.fila));
-    const tdE = el('td'); tdE.append(tag(l.empresa, 'empresa', l.empresa), document.createTextNode(' / '), tag(l.produto || 'sem produto', 'produto', l.produto || '— sem produto —'));
-    r.append(el('td', null, quando(l.quando)), el('td', null, l.titulo), tdF, tdE, el('td', null, l.natureza === 'ai' ? 'IA' : l.natureza), el('td', null, l.executor || '—'), el('td', 'n', moeda(l.valor)));
+    r.append(el('td', null, quando(l.quando)), el('td', null, l.titulo), tdF, el('td', null, (l.executor || '—').split(' · ')[0]), el('td', 'n', l.minutos != null ? num(l.minutos) : '—'), el('td', 'n', moeda(l.valor)));
     tl.appendChild(r);
   }
-  if (!lanc.length) { const r = el('tr'); const td = el('td', 'vazio', 'Nenhum lançamento.'); td.colSpan = 7; r.appendChild(td); tl.appendChild(r); }
 }
 
 /* ── ABA Report ───────────────────────────────────────────────────────────── */
@@ -693,11 +701,13 @@ function desenharReport() {
   kpi(k, 'Concluídos', num(lista.filter((i) => i.estado === 'done').length), `${num(lista.filter((i) => i.estado === 'done' && i.tem_prova).length)} com prova`, 'ok');
   kpi(k, 'Parados / travados', num(lista.filter((i) => aberto(i) && pendente(i)).length), 'precisam de você', lista.some((i) => aberto(i) && pendente(i)) ? 'atencao' : '');
   kpi(k, 'Técnico × negócio', `${num(lista.filter((i) => i.natureza === 'técnico').length)} × ${num(lista.filter((i) => i.natureza === 'negócio').length)}`, 'itens por natureza');
-  kpi(k, 'Custo', moeda(lista.reduce((s, i) => s + Number(i.gasto || 0), 0)), 'gasto registrado nos itens listados');
+  const custeio = new Map((((RETRATO.custos || {}).custeio || {}).itens || []).map((x) => [x.id, Number(x.custo_real || 0)]));
+  const custoReal = (i) => custeio.has(i.id) ? custeio.get(i.id) : 0;
+  kpi(k, 'Custo real (mês)', moeda(lista.reduce((s, i) => s + custoReal(i), 0)), 'rateado do que você paga · consumo: ' + moeda(lista.reduce((s, i) => s + Number(i.gasto || 0), 0)));
   kpi(k, 'Desvios', num(lista.reduce((s, i) => s + Number((i.caminho || {}).desvios || 0), 0)), `em ${num(lista.filter((i) => (i.caminho || {}).desvios > 0).length)} item(ns)`);
 
   const t = $('tabela-report'); t.replaceChildren();
-  const cab = el('tr'); for (const [h, n] of [['Data', 0], ['Item', 0], ['Empresa / produto', 0], ['Fila', 0], ['Status', 0], ['Quem abriu', 0], ['Natureza', 0], ['Passos / desvios', 1], ['Custo', 1]]) cab.appendChild(el('th', n ? 'n' : '', h)); t.appendChild(cab);
+  const cab = el('tr'); for (const [h, n] of [['Data', 0], ['Item', 0], ['Empresa / produto', 0], ['Fila', 0], ['Status', 0], ['Quem abriu', 0], ['Natureza', 0], ['Passos / desvios', 1], ['Custo real', 1]]) cab.appendChild(el('th', n ? 'n' : '', h)); t.appendChild(cab);
   for (const i of lista) {
     const r = el('tr');
     const tdE = el('td'); tdE.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'));
@@ -706,10 +716,10 @@ function desenharReport() {
     const tdQ = el('td'); tdQ.appendChild(tag(i.quem_abriu || '—', 'quem', i.quem_abriu));
     const tdN = el('td'); tdN.appendChild(tag(i.natureza, 'natureza', i.natureza));
     const tdT = el('td'); const bt = el('button', 'btn-texto', i.titulo); bt.style.padding = '0'; bt.style.textAlign = 'left'; bt.addEventListener('click', () => { ABERTOS.add(i.id); ABA = 'cc'; SUB = 'status'; F.estado = i.estado; mostrarAba(); render(); }); tdT.appendChild(bt);
-    r.append(el('td', null, quando(i[base])), tdT, tdE, tdF, tdS, tdQ, tdN, el('td', 'n', `${num((i.caminho || {}).passos_percorridos)} / ${num((i.caminho || {}).desvios)}`), el('td', 'n', moeda(i.gasto)));
+    r.append(el('td', null, quando(i[base])), tdT, tdE, tdF, tdS, tdQ, tdN, el('td', 'n', `${num((i.caminho || {}).passos_percorridos)} / ${num((i.caminho || {}).desvios)}`), el('td', 'n', moeda(custoReal(i))));
     t.appendChild(r);
   }
-  const tot = el('tr', 'total'); const tdt = el('td', null, `Total: ${num(lista.length)} item(ns)`); tdt.colSpan = 8; tot.append(tdt, el('td', 'n', moeda(lista.reduce((s, i) => s + Number(i.gasto || 0), 0)))); t.appendChild(tot);
+  const tot = el('tr', 'total'); const tdt = el('td', null, `Total: ${num(lista.length)} item(ns)`); tdt.colSpan = 8; tot.append(tdt, el('td', 'n', moeda(lista.reduce((s, i) => s + custoReal(i), 0)))); t.appendChild(tot);
 }
 
 /* ── render geral ─────────────────────────────────────────────────────────── */
