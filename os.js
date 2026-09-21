@@ -390,7 +390,7 @@ const C_LEVEL = [
   { papel: 'CFO', nome: 'Jack Check', filas: ['financeiro'], agente: 'jack-check' },
   { papel: 'CMO', nome: 'Phill Mark', filas: ['marketing'], agente: 'phill-mark' },
   { papel: 'CPO', nome: 'John Prod', filas: ['produto'], agente: 'john-prod' },
-  { papel: 'COO', nome: 'Operations', filas: ['operacoes', 'engenharia'], agente: 'operacoes' },
+  { papel: 'COO', nome: 'Jonhy Ops', filas: ['operacoes', 'engenharia'], agente: 'operacoes' },
 ];
 function contagens(lista) {
   return { abertos: lista.filter(aberto).length, parados: lista.filter((i) => aberto(i) && pendente(i)).length, exec: lista.filter((i) => i.estado === 'in_progress').length };
@@ -418,7 +418,7 @@ function desenharOrg() {
   Object.assign(F, Object.fromEntries(Object.entries(guardados).filter(([, v]) => v !== undefined)));
 
   const ceoN = { abertos: base.filter((i) => aberto(i) && i.fila === 'executiva').length, parados: base.filter((i) => aberto(i) && pendente(i)).length, exec: 0 };
-  const ceo = caixa('ceo', 'CEO', SESSAO.user.email.split('@')[0], 'alçada executiva · fila executiva', ceoN, F.pendente === true, () => alternar('pendente', true));
+  const ceo = caixa('ceo', 'CEO', 'Renato Correa', 'alçada executiva · fila executiva', ceoN, F.pendente === true, () => alternar('pendente', true));
   ceo.querySelector('.selos .pill').title = 'na fila executiva'; ceo.querySelector('.selos .pill').className = 'pill';
   org.append(el('div', 'org-nivel').appendChild(ceo).parentElement, el('div', 'org-ligacao'));
 
