@@ -101,8 +101,19 @@ $('sair').addEventListener('click', () => { if (RELOGIO) clearInterval(RELOGIO);
 $('atualizar').addEventListener('click', () => abrirCasa().catch((e) => alert(e.message)));
 
 /* ── abrir a casa ─────────────────────────────────────────────────────────── */
+// ⚠ (D-14) A TERCEIRA FILA vem numa chamada PRÓPRIA, e não dentro do retrato.
+//    Duas razões: ela tem cadência diferente (o portão registra quando algo
+//    acontece, não a cada minuto), e a porta `company_os_meus_avisos` foi
+//    DECLARADA em portas_humanas — porta declarada que ninguém abre é teto de
+//    advisor inflado por nada, exatamente o que o C6 existe para evitar.
+//    As duas saem em paralelo: o tempo de tela é o da mais lenta, não a soma.
+let AVISOS = { sem_ciencia: 0, itens: [] }
 async function abrirCasa() {
-  const retrato = await rpc('company_os_meu_retrato');
+  const [retrato, avisos] = await Promise.all([
+    rpc('company_os_meu_retrato'),
+    rpc('company_os_meus_avisos').catch(() => null),
+  ])
+  if (avisos && avisos.itens) AVISOS = avisos
   if (!retrato || !retrato.estrutura) {
     mostrar($('erro-login'), 'Você entrou, mas esta conta não tem alçada declarada no Company OS. Nada aqui é da sua conta.', false);
     apagarSessao();
@@ -691,6 +702,83 @@ function desenharMedidor(alvo) {
   alvo.appendChild(cx);
 }
 
+/* ── ABA Avisos (D-14) ────────────────────────────────────────────────────── */
+/* ⚠ Esta fila NÃO pede decisão. O que exige alçada vai para Aprovações, e o
+   OS41 reprova quem tentar usar esta porta para fugir disso. Aqui o CEO dá
+   CIÊNCIA — e, se quiser entender, abre pergunta ao COO. */
+async function acaoAviso(fn, corpo, msg) {
+  try {
+    await rpc(fn, corpo)
+    mostrar($('msg-avisos'), msg, true)
+    await abrirCasa()
+  } catch (e) { mostrar($('msg-avisos'), String(e.message || e), false) }
+}
+function desenharAvisos() {
+  const lista = AVISOS.itens || []
+  const novos = lista.filter((a) => !a.visto_em)
+  const pill = $('pill-avisos')
+  pill.hidden = !novos.length
+  if (novos.length) { pill.className = 'pill ambar'; pill.textContent = String(novos.length) }
+
+  $('sub-avisos').textContent = !lista.length
+    ? 'Nada para você saber agora. Quando o sistema parar por algo que você não precisa decidir, ele conta aqui.'
+    : `${novos.length} sem ciência${lista.length > novos.length ? ` · ${lista.length - novos.length} já vistos nos últimos 14 dias` : ''}. Nada aqui espera decisão sua.`
+
+  const barra = $('barra-ciencia'); barra.hidden = !novos.length
+  $('dica-ciencia').textContent = novos.length ? `${novos.length} aviso(s) — ciência é só "eu li".` : ''
+
+  const alvo = $('lista-avisos'); alvo.replaceChildren()
+  if (!lista.length) { alvo.appendChild(el('p', 'vazio', 'Fila de avisos limpa.')); return }
+
+  for (const a of lista) {
+    const cx = el('article', 'item' + (a.visto_em ? ' info' : ' espera'))
+    cx.appendChild(el('h4', null, a.assunto))
+    const m = el('div', 'meta')
+    // ⚠ O TOM diz há quanto tempo ele está parado ali: a régua OS41 acende aos
+    //    7 dias, e a tela avisa antes de a régua acender.
+    const d = Number(a.dias_sem_ciencia)
+    m.appendChild(el('span', 'sit ' + (a.visto_em ? 'ok' : d >= 7 ? 'parado' : 'espera'),
+      a.visto_em ? 'ciência dada' : d >= 1 ? `sem ciência há ${d} dia(s)` : 'novo'))
+    m.appendChild(el('span', null, a.origem))
+    const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, quando(a.criado_em)))
+    m.appendChild(dir)
+    cx.appendChild(m)
+    // ⚠ O corpo inteiro, sem cortar: ele diz o que mudou, o que já foi tentado
+    //    e o que acontece se nada for feito. Cortar isso devolveria ao CEO a
+    //    tarefa em vez da decisão, que é o §10.2 ao contrário.
+    cx.appendChild(el('div', 'descricao', a.corpo))
+    if (a.medido && Object.keys(a.medido).length) {
+      const det = el('details'); det.appendChild(el('summary', null, 'Ver os números medidos'))
+      const pre = el('pre', null, JSON.stringify(a.medido, null, 2)); det.appendChild(pre); cx.appendChild(det)
+    }
+
+    const caixa = el('div', 'acao-caixa')
+    if (!a.visto_em) {
+      const b = el('button', 'btn sec', 'Dar ciência')
+      b.addEventListener('click', () => acaoAviso('company_os_dar_ciencia', { p_ids: [a.id] }, 'Ciência registrada.'))
+      caixa.appendChild(b)
+    }
+    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta já aberta ao COO.'))
+    else {
+      const inp = el('input'); inp.placeholder = 'Perguntar ao COO (mínimo 10 letras)'
+      const b2 = el('button', 'btn', 'Perguntar')
+      b2.addEventListener('click', () => {
+        if (inp.value.trim().length < 10) { mostrar($('msg-avisos'), 'Escreva a pergunta (mínimo 10 letras).', false); return }
+        acaoAviso('company_os_perguntar_ao_coo', { p_aviso_id: a.id, p_pergunta: inp.value.trim() },
+                  'Pergunta aberta ao COO, com o fato medido junto.')
+      })
+      caixa.append(inp, b2)
+    }
+    cx.appendChild(caixa)
+    alvo.appendChild(cx)
+  }
+}
+$('btn-ciencia').addEventListener('click', () => {
+  const ids = (AVISOS.itens || []).filter((a) => !a.visto_em).map((a) => a.id).slice(0, 50)
+  if (!ids.length) return
+  acaoAviso('company_os_dar_ciencia', { p_ids: ids }, `Ciência registrada em ${ids.length} aviso(s).`)
+})
+
 function desenharMonitor() {
   const vig = RETRATO.vigilancia || { total: 0, vermelhos: [] };
   const p = RETRATO.plantao || {};
@@ -876,7 +964,7 @@ function render() {
   if (!RETRATO) return;
   desenharChips(); montarSeletores();
   desenharAprov(); desenharStatus(); desenharOrg(); desenharPaths();
-  desenharPedido(); desenharMonitor(); desenharCustos(); desenharReport();
+  desenharPedido(); desenharAvisos(); desenharMonitor(); desenharCustos(); desenharReport();
   mostrarAba();
 }
 

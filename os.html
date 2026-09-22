@@ -33,6 +33,7 @@
     <nav class="abas" id="abas" aria-label="Abas">
       <button data-aba="cc" aria-selected="true">Command Center</button>
       <button data-aba="pedido">Novo pedido</button>
+      <button data-aba="avisos">Avisos <span class="pill" id="pill-avisos" hidden></span></button>
       <button data-aba="monitor">Monitor <span class="pill" id="pill-monitor" hidden></span></button>
       <button data-aba="custos">Custos <span class="pill" id="pill-custos" hidden></span></button>
       <button data-aba="report">Report</button>
@@ -135,7 +136,18 @@
       <div class="lista" id="meus-pedidos"></div>
     </section>
 
-    <!-- ABA 3: MONITOR -->
+    <!-- ABA 3: AVISOS (D-14) — o que você precisa saber e não exige decisão sua -->
+    <section class="aba" data-aba="avisos" hidden>
+      <p class="sub-texto" id="sub-avisos"></p>
+      <div class="acao-caixa" id="barra-ciencia" hidden>
+        <button id="btn-ciencia" class="btn sec">Dar ciência em todos os não vistos</button>
+        <span class="dica" id="dica-ciencia"></span>
+      </div>
+      <p class="aviso" id="msg-avisos" role="status" hidden></p>
+      <div class="lista acao" id="lista-avisos"></div>
+    </section>
+
+    <!-- ABA 4: MONITOR -->
     <section class="aba" data-aba="monitor" hidden>
       <div class="kpis" id="kpis-monitor"></div>
       <div class="grade-2 topo-espaco">
