@@ -205,11 +205,15 @@ pre { font: .78rem/1.45 var(--mono); background: var(--papel-2); padding: .6rem 
    é um diagrama, não texto. A margem negativa devolve o respiro lateral do
    .conteudo, e a rolagem só aparece quando de fato não cabe. */
 .org {
-  display: flex; flex-direction: column; align-items: stretch; gap: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
   margin: 0 -1.5rem 1.5rem; padding: .5rem 1.5rem 1rem; overflow-x: auto; min-width: 0;
   scrollbar-width: thin;
 }
 .org > * { flex-shrink: 0; }
+/* ⚠ Só as FILEIRAS esticam: são as únicas largas o bastante para transbordar,
+   e é nelas que o `safe center` precisa agir. As ligações e os rótulos seguem
+   centrados como filhos normais. */
+.org > .org-nivel { align-self: stretch; }
 .org-nivel { display: flex; justify-content: safe center; gap: 1rem; flex-wrap: nowrap; position: relative; }
 .org-ligacao { width: 2px; height: 1.4rem; background: var(--linha-2); }
 .org-ligacao.larga { width: 100%; height: 2px; max-width: 60rem; margin: 0 auto; }
@@ -344,3 +348,27 @@ pre { font: .78rem/1.45 var(--mono); background: var(--papel-2); padding: .6rem 
 .cab-secao { display: flex; align-items: baseline; gap: .75rem; }
 .cab-secao h3 { margin-bottom: 0; }
 .cab-secao .direita { margin-left: auto; }
+
+/* ── consertos vistos na prévia (22/09) ───────────────────────────────────── */
+/* ⚠ Data e dinheiro ficavam presos na primeira linha do meta e o resto da
+   linha quebrava POR BAIXO deles, com o número pendurado no ar. Fixados no
+   alto à direita, o texto passa a quebrar livremente sob eles. */
+.item .meta { position: relative; padding-right: 11rem; }
+.item .meta .meta-dir { position: absolute; right: 0; top: .1rem; margin-left: 0; }
+@media (max-width: 640px) {
+  .item .meta { padding-right: 0; }
+  .item .meta .meta-dir { position: static; width: 100%; }
+}
+/* ⚠ Texto de seção dentro da grade roubava uma célula e abria um buraco. */
+.lista.grade > .dica.larga, .lista.grade > .vazio, .lista.grade > .info-titulo { grid-column: 1 / -1; }
+/* ⚠ A fileira de squads é mais larga que a tela de propósito. Sem um sinal de
+   que ROLA, o corte na borda parece defeito — que foi exatamente a leitura do
+   CEO. A sombra à direita só aparece quando há o que rolar. */
+.org { background:
+  linear-gradient(to right, var(--papel-2) 30%, rgba(245,247,250,0)) left center,
+  linear-gradient(to left,  var(--papel-2) 30%, rgba(245,247,250,0)) right center,
+  linear-gradient(to right, rgba(20,26,34,.10), rgba(20,26,34,0)) left center,
+  linear-gradient(to left,  rgba(20,26,34,.10), rgba(20,26,34,0)) right center;
+  background-repeat: no-repeat; background-size: 2.5rem 100%, 2.5rem 100%, .8rem 100%, .8rem 100%;
+  background-attachment: local, local, scroll, scroll;
+}

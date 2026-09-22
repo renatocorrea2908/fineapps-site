@@ -338,11 +338,24 @@ function desenharAprov() {
     const cx = el('article', 'item espera');
     cx.appendChild(el('h4', null, p.titulo));
     const m = el('div', 'meta');
-    m.appendChild(el('span', 'estado', (p.classe === 'travado' && p.contexto && p.contexto.escalado_pelo_cto) ? 'escalado pelo CTO — precisa da sua decisão' : (ROTULO_CLASSE[p.classe] || p.classe)));
-    m.appendChild(el('span', null, `${p.dias_esperando} dia(s) esperando`));
-    if (i) m.append(tag(i.empresa, 'empresa', i.empresa), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'), tag('fila ' + i.fila, 'fila', i.fila), tag(i.natureza, 'natureza', i.natureza));
-    m.appendChild(el('span', null, `impacto ${p.impacto || '—'}`));
-    if (Number(p.custo_ja_gasto) > 0) m.appendChild(el('span', null, `já gastou ${moeda(p.custo_ja_gasto)}`));
+    // ⚠ Aprovações montava o próprio cartão e por isso ficou de fora da
+    //    primeira passada — a aba mais importante da tela seguia com a linha
+    //    corrida e com `impacto none` na cara do CEO. Mesmo padrão do resto:
+    //    situação colorida, grupos com divisor, espera e dinheiro à direita.
+    const escalado = p.classe === 'travado' && p.contexto && p.contexto.escalado_pelo_cto;
+    m.appendChild(el('span', 'sit espera', escalado ? 'escalado pelo CTO — precisa da sua decisão' : (ROTULO_CLASSE[p.classe] || p.classe)));
+    if (i) m.append(tag(i.empresa, 'empresa', i.empresa), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
+                    tag(i.fila, 'fila', i.fila), el('span', 'div', '·'), tag(rotuloTipo(i.tipo), 'tipo', i.tipo));
+    const impA = IMPACTOS[p.impacto];
+    if (impA) m.appendChild(el('span', null, impA));
+    const dirA = el('span', 'meta-dir');
+    // ⚠ "2 dia(s) esperando" é o número que ordena esta lista: fica à direita,
+    //    alinhado com os outros, e em âmbar a partir de 2 dias.
+    const esp = el('span', Number(p.dias_esperando) >= 2 ? 'dinheiro' : null, `${p.dias_esperando} dia(s) esperando`);
+    if (Number(p.dias_esperando) >= 2) esp.style.color = 'var(--alerta)';
+    dirA.appendChild(esp);
+    if (Number(p.custo_ja_gasto) > 0) dirA.appendChild(el('span', 'dinheiro', moeda(p.custo_ja_gasto)));
+    m.appendChild(dirA);
     cx.append(m, el('p', 'porque', p.porque_voce));
     if (i && i.descricao) { const d = el('details'); d.append(el('summary', null, 'Ver o pedido inteiro'), el('div', 'descricao', i.descricao)); cx.appendChild(d); }
     if (p.classe === 'aguarda_alcada') cx.appendChild(caixaAcao(p, [['Aprovar', 'company_os_minha_aprovacao', 'p_observacao', { p_canal: 'tela-os' }]], 'Por que você está aprovando (mínimo 10 letras)'));
@@ -367,7 +380,11 @@ function desenharAprov() {
       const cx = el('article', 'item info');
       cx.appendChild(el('h4', null, e.titulo));
       const m = el('div', 'meta');
-      m.append(el('span', 'estado', e.concluida ? 'em produção' : 'aceita pelo CI — concluindo'), el('span', null, quando(e.aceita_em)), tag(e.empresa, 'empresa', e.empresa), tag(e.produto || 'sem produto', 'produto', e.produto || '— sem produto —'), tag('fila ' + e.fila, 'fila', e.fila), el('span', null, e.alcada === 'technical' || e.alcada === 'none' ? 'técnico (7b)' : 'aprovado por você na entrada (7c)'));
+      m.append(el('span', 'sit ok', e.concluida ? 'em produção' : 'aceita pelo CI — concluindo'),
+               tag(e.empresa, 'empresa', e.empresa), tag(e.produto || 'sem produto', 'produto', e.produto || '— sem produto —'),
+               tag(e.fila, 'fila', e.fila), el('span', 'div', '·'),
+               el('span', null, e.alcada === 'technical' || e.alcada === 'none' ? 'aceita pela régua técnica (7b)' : 'você aprovou na entrada (7c)'));
+      const dirR = el('span', 'meta-dir'); dirR.appendChild(el('span', null, quando(e.aceita_em))); m.appendChild(dirR);
       cx.appendChild(m);
       if (/^https?:\/\//.test(e.referencia || '')) { const a = el('a', 'ligacao', 'Ver a entrega (PR)'); a.href = e.referencia; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
       alvo.appendChild(cx);
@@ -417,7 +434,9 @@ function desenharStatus() {
     bd.appendChild(b);
   }
   const lista = itens().filter((i) => F.estado ? true : aberto(i)).sort((a, b) => new Date(b.atualizado || b.criado) - new Date(a.atualizado || a.criado));
-  $('lista-status').replaceChildren(el('p', 'dica', F.estado ? `${lista.length} item(ns) em "${rotuloEstado(F.estado)}" · clique no título para ler a tarefa` : `${lista.length} em aberto · clique num status para ver a composição · clique no título para ler a tarefa`));
+  // ⚠ A dica é texto de seção, não item: numa grade ela roubava uma célula e
+  //    abria um buraco no canto. Atravessa as colunas.
+  $('lista-status').replaceChildren(el('p', 'dica larga', F.estado ? `${lista.length} item(ns) em "${rotuloEstado(F.estado)}" · clique no título para ler a tarefa` : `${lista.length} em aberto · clique num status para ver a composição · clique no título para ler a tarefa`));
   for (const i of lista) $('lista-status').appendChild(cartaoItem(i));
   if (!lista.length) $('lista-status').appendChild(el('p', 'vazio', 'Nada aqui com os filtros atuais.'));
 }
