@@ -34,7 +34,7 @@
       <button data-aba="cc" aria-selected="true">Command Center</button>
       <button data-aba="pedido">Novo pedido</button>
       <button data-aba="monitor">Monitor <span class="pill" id="pill-monitor" hidden></span></button>
-      <button data-aba="custos">Custos</button>
+      <button data-aba="custos">Custos <span class="pill" id="pill-custos" hidden></span></button>
       <button data-aba="report">Report</button>
     </nav>
     <div class="topo-direita">
@@ -71,13 +71,13 @@
 
       <div class="sub" data-sub="aprov">
         <p class="sub-texto" id="sub-aprov"></p>
-        <div class="lista" id="lista-aprov"></div>
+        <div class="lista acao" id="lista-aprov"></div>
       </div>
 
       <div class="sub" data-sub="status" hidden>
         <div class="faixa-executor" id="faixa-executor"></div>
         <div class="badges" id="badges-status"></div>
-        <div class="lista" id="lista-status"></div>
+        <div class="lista grade" id="lista-status"></div>
       </div>
 
       <div class="sub" data-sub="filas" hidden>
@@ -90,9 +90,9 @@
         <p class="sub-texto">Caminho esperado: <span class="cam-esperado" id="cam-esperado"></span>. Cada tarefa mostra o que percorreu; desvios em âmbar, perna não classificada em vermelho.</p>
         <div class="badges" id="badges-paths"></div>
         <h3>Em aberto</h3>
-        <div class="lista" id="paths-abertos"></div>
+        <div class="lista grade" id="paths-abertos"></div>
         <h3>Fechados</h3>
-        <div class="lista" id="paths-fechados"></div>
+        <div class="lista grade" id="paths-fechados"></div>
       </div>
     </section>
 
@@ -156,6 +156,9 @@
 
     <!-- ABA 4: CUSTOS -->
     <section class="aba" data-aba="custos" hidden>
+      <!-- M418 — o medidor de consumo, antes dos números do mês: ele responde
+           "quanto falta para o limite", que é a pergunta que vem primeiro. -->
+      <div id="medidor-consumo" class="faixa-topo"></div>
       <div class="kpis" id="kpis-custos"></div>
       <div class="grade-2 topo-espaco">
         <div>

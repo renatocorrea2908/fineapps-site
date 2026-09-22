@@ -262,6 +262,18 @@ function situacao(i) {
   return rotuloEstado(i.estado) || i.estado;
 }
 
+/* ⚠ O TOM da situação é a única cor do cartão. Antes tudo era cinza e negrito,
+   e 60 itens tinham exatamente o mesmo peso visual — varrer a lista não dizia
+   nada. Agora a cor responde "isto anda sozinho ou depende de mim?". */
+function tomDoItem(i) {
+  if (i.estado === 'decision_required') return 'parado';
+  if (i.aguarda_alcada || i.entrega_aberta) return 'espera';
+  if (i.estado === 'in_progress') return 'anda';
+  if (i.estado === 'done') return 'ok';
+  if (i.estado === 'cancelled') return '';
+  return '';
+}
+
 /* ── cartão de item (reutilizado em todas as listas) ──────────────────────── */
 function tag(rotulo, chave, valor) {
   const s = el('span', 'tag', rotulo); s.title = `Filtrar por ${ROTULO_F[chave] || chave}: ${valor}`;
@@ -273,12 +285,23 @@ function cartaoItem(i, opts = {}) {
   const cab = el('button', 'item-cab'); cab.setAttribute('aria-expanded', String(ABERTOS.has(i.id)));
   cab.appendChild(el('h4', null, i.titulo));
   const m = el('div', 'meta');
-  m.appendChild(el('span', 'estado', situacao(i)));
-  m.append(tag(i.empresa || '—', 'empresa', i.empresa), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
-           tag('fila ' + i.fila, 'fila', i.fila), tag(i.natureza, 'natureza', i.natureza), tag(i.tipo, 'tipo', i.tipo),
-           tag('prioridade ' + i.prioridade, 'prioridade', i.prioridade), tag('abriu: ' + (i.quem_abriu || '—'), 'quem', i.quem_abriu));
-  m.appendChild(el('span', null, `aberto em ${dia(i.criado)}`));
-  if (Number(i.gasto) > 0) m.appendChild(el('span', null, `gasto ${moeda(i.gasto)}`));
+  // ⚠ A situação primeiro, e colorida: é ela que decide se você para neste
+  //    cartão. Depois ONDE (empresa · produto · fila), um divisor, e O QUE
+  //    (tipo · prioridade · impacto). Data e dinheiro vão para a direita.
+  const sit = el('span', 'sit ' + tomDoItem(i), situacao(i));
+  m.appendChild(sit);
+  const div = () => el('span', 'div', '·');
+  m.append(tag(i.empresa || '—', 'empresa', i.empresa),
+           tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
+           tag(i.fila, 'fila', i.fila), div(),
+           tag(rotuloTipo(i.tipo), 'tipo', i.tipo),
+           tag(PRIORIDADES[i.prioridade] || i.prioridade, 'prioridade', i.prioridade));
+  const imp = IMPACTOS[i.impacto];
+  if (imp) m.appendChild(el('span', null, imp));
+  const dir = el('span', 'meta-dir');
+  dir.appendChild(el('span', null, dia(i.criado)));
+  if (Number(i.gasto) > 0) dir.appendChild(el('span', 'dinheiro', moeda(i.gasto)));
+  m.appendChild(dir);
   cab.appendChild(m);
   cab.addEventListener('click', () => { if (ABERTOS.has(i.id)) ABERTOS.delete(i.id); else ABERTOS.add(i.id); render(); });
   cx.appendChild(cab);
@@ -480,23 +503,70 @@ function desenharOrg() {
 }
 
 /* ── ABA CC › Paths ───────────────────────────────────────────────────────── */
+/* ⚠ O §10.2 promete "linguagem de negócio, sem nome de token nem log", e a
+   tela mostrava `technical_bug`, `infrastructure`, `impacto none`. Os nomes do
+   banco ficam no banco; aqui sai português. Tipo desconhecido cai no próprio
+   nome com o underline trocado por espaço — nunca some, nunca vira "outro". */
+const TIPOS = {
+  business_feature: 'funcionalidade', business_rule: 'regra de negócio', technical_bug: 'defeito',
+  technical_debt: 'dívida técnica', infrastructure: 'infraestrutura', security: 'segurança',
+  operational_incident: 'incidente', structural_change: 'mudança estrutural', capacity: 'capacidade',
+  decision: 'decisão', product: 'produto',
+};
+const IMPACTOS = { none: null, low: 'impacto baixo', medium: 'impacto médio', high: 'impacto alto', critical: 'impacto crítico' };
+const PRIORIDADES = { critica: 'crítica', alta: 'alta', media: 'média', baixa: 'baixa' };
+const rotuloTipo = (k) => TIPOS[k] || String(k || '—').replace(/_/g, ' ');
+
 const NOME_LUGAR = { request_intake: 'pedido', work_item: 'item', fila: 'fila', execucao: 'execução', entrega: 'entrega', aceite: 'aceite', concluido: 'concluído', mesa: 'aprovações', cancelado: 'cancelado' };
 const lugar = (l) => NOME_LUGAR[l] || l;
+/* ⚠ Eram 15 a 20 pastilhas por item, com `execução → fila` repetido dez vezes
+   seguidas: o log cru na tela. Duas mudanças: repetição CONSECUTIVA vira
+   contador (×7), e o caminho inteiro sai da frente — fica o RESUMO, que é o
+   que responde "este item andou ou ficou rodando?", com o detalhe a um clique.
+   Nenhum passo é jogado fora; o que muda é o que aparece primeiro. */
+function dobrarRepetidos(perc) {
+  const out = [];
+  for (const s of perc) {
+    const ult = out[out.length - 1];
+    if (ult && ult.de === s.de && ult.para === s.para && ult.classificacao === s.classificacao) { ult.n += 1; ult.ultimo = s; continue; }
+    out.push({ ...s, n: 1, ultimo: s });
+  }
+  return out;
+}
 function desenharPath(i) {
-  const p = el('div', 'path');
+  const envolve = el('div');
   const perc = i.percorrido || [];
-  if (!perc.length) { p.appendChild(el('span', 'passo falta', 'sem passos registrados')); return p; }
-  perc.forEach((s, n) => {
-    const cls = s.classificacao === 'esperado' ? 'ok' : s.classificacao === 'desvio_conhecido' ? 'desvio' : 'ruim';
-    const chip = el('span', 'passo ' + cls, `${lugar(s.de)} → ${lugar(s.para)}`);
-    chip.title = `${quando(s.quando)} · ${s.desfecho}${s.motivo ? ' · ' + s.motivo : ''}`;
+  const r = i.caminho || {};
+
+  const res = el('div', 'path-resumo');
+  const cls = r.nao_classificados ? 'ruim' : r.desvios ? 'desvio' : 'limpo';
+  const rot = r.nao_classificados ? `${r.nao_classificados} perna(s) não classificada(s)` : r.desvios ? `${r.desvios} desvio(s)` : 'caminho limpo';
+  res.appendChild(el('span', 'selo ' + cls, rot));
+  res.appendChild(el('span', null, `${r.passos_percorridos || 0} passo(s)`));
+  // ⚠ A volta repetida é o sintoma que interessa: item que anda é diferente de
+  //    item que gira. O maior laço é dito em palavras, não deduzido de pastilha.
+  const dobrado = dobrarRepetidos(perc);
+  const maior = dobrado.reduce((a, b) => (b.n > (a ? a.n : 0) ? b : a), null);
+  if (maior && maior.n > 1) res.appendChild(el('span', null, `voltou ${maior.n}× em ${lugar(maior.de)} → ${lugar(maior.para)}`));
+  envolve.appendChild(res);
+
+  if (!perc.length) { res.appendChild(el('span', null, 'sem passos registrados')); return envolve; }
+
+  const det = el('details');
+  det.appendChild(el('summary', null, 'Ver o caminho passo a passo'));
+  const p = el('div', 'path');
+  dobrado.forEach((s, n) => {
+    const c = s.classificacao === 'esperado' ? 'ok' : s.classificacao === 'desvio_conhecido' ? 'desvio' : 'ruim';
+    const chip = el('span', 'passo ' + c, `${lugar(s.de)} → ${lugar(s.para)}`);
+    if (s.n > 1) chip.appendChild(el('span', 'x', ' ×' + s.n));
+    chip.title = `${quando(s.ultimo.quando)} · ${s.ultimo.desfecho}${s.ultimo.motivo ? ' · ' + s.ultimo.motivo : ''}`;
     if (n) p.appendChild(el('span', 'seta', '›'));
     p.appendChild(chip);
   });
-  for (const f of (i.caminho && i.caminho.faltando) || []) { p.appendChild(el('span', 'seta', '›')); const c = el('span', 'passo falta', `${lugar(f.de)} → ${lugar(f.para)}`); c.title = 'ainda não percorrido'; p.appendChild(c); }
-  const r = i.caminho || {};
-  p.appendChild(el('span', 'seta', ` ${r.passos_percorridos || 0} passos · ${r.desvios || 0} desvio(s)${r.nao_classificados ? ' · ' + r.nao_classificados + ' NÃO classificado(s)' : ''}${r.caminho_limpo ? ' · limpo' : ''}`));
-  return p;
+  for (const fa of (r.faltando) || []) { p.appendChild(el('span', 'seta', '›')); const c = el('span', 'passo falta', `${lugar(fa.de)} → ${lugar(fa.para)}`); c.title = 'ainda não percorrido'; p.appendChild(c); }
+  det.appendChild(p);
+  envolve.appendChild(det);
+  return envolve;
 }
 function desenharPaths() {
   const esp = [...(RETRATO.estrutura.caminho_esperado || [])].sort((a, b) => a.passo - b.passo);
@@ -552,6 +622,56 @@ function linhas(alvo, pares) {
   }
   if (!pares.length) alvo.appendChild(el('p', 'vazio', 'Nada.'));
 }
+/* ⚠ O MEDIDOR DE CONSUMO (M418). O CEO pediu três — Claude, GitHub e Vercel —
+   com avisos em 50, 75 e 90%. Medido: só o GitHub tem API hoje. Os outros dois
+   vêm do banco NOMEADOS, com o motivo, e aparecem apagados no pé do medidor:
+   painel que simplesmente omite o que não mede deixa quem olha achando que
+   está vendo tudo. Nenhum número nasce aqui — o banco calcula (§10.1). */
+function desenharMedidor(alvo) {
+  alvo.replaceChildren();
+  const c = (RETRATO.painel && RETRATO.painel.consumo) || null;
+  if (!c) { alvo.appendChild(el('p', 'vazio', 'O banco ainda não devolve o medidor de consumo.')); return; }
+  const faixa = c.faixa || 'sem_medicao';
+  const cx = el('div', 'medidor ' + faixa);
+
+  const cab = el('div', 'cab');
+  cab.appendChild(el('span', 'nome', 'GitHub Actions'));
+  cab.appendChild(el('span', 'pill', c.limite_vigente === 'orcamento_usd' ? 'contra o orçamento' : 'contra a franquia'));
+  cab.appendChild(el('span', 'pct', c.percentual == null ? 'sem medição' : `${String(c.percentual).replace('.', ',')}%`));
+  cx.appendChild(cab);
+
+  cx.appendChild(el('p', 'frase', c.aviso || '—'));
+
+  const trilho = el('div', 'trilho');
+  const largura = Math.max(0, Math.min(100, Number(c.percentual) || 0));
+  const dentro = el('div', 'preenche'); dentro.style.width = largura + '%';
+  trilho.appendChild(dentro);
+  // ⚠ As três marcas ficam DESENHADAS no trilho: sem elas, "56%" não responde
+  //    "isso é perto?". As faixas vêm do banco, não daqui.
+  for (const k of ['aviso_1', 'aviso_2', 'aviso_3']) {
+    const v = c.faixas && c.faixas[k];
+    if (v == null) continue;
+    const marca = el('i'); marca.style.left = Math.min(100, Number(v)) + '%'; marca.title = `aviso de ${v}%`;
+    trilho.appendChild(marca);
+  }
+  cx.appendChild(trilho);
+
+  const esc = el('div', 'escala');
+  const un = c.unidade === 'USD' ? (n) => 'US$ ' + Number(n).toFixed(2).replace('.', ',') : (n) => num(n) + ' min';
+  esc.append(el('span', null, c.usado == null ? '—' : un(c.usado)),
+             el('span', null, c.teto == null ? '—' : 'de ' + un(c.teto)));
+  cx.appendChild(esc);
+
+  const aus = c.nao_medidos || [];
+  if (aus.length) {
+    const box = el('div', 'ausentes');
+    box.appendChild(el('b', null, 'Ainda sem medição automática:'));
+    for (const a of aus) box.appendChild(el('p', null, `${a.medidor === 'claude' ? 'Claude' : a.medidor === 'vercel' ? 'Vercel' : a.medidor} — ${a.porque}`));
+    cx.appendChild(box);
+  }
+  alvo.appendChild(cx);
+}
+
 function desenharMonitor() {
   const vig = RETRATO.vigilancia || { total: 0, vermelhos: [] };
   const p = RETRATO.plantao || {};
@@ -609,6 +729,16 @@ function desenharRampas() {
 
 /* ── ABA Custos ───────────────────────────────────────────────────────────── */
 function desenharCustos() {
+  desenharMedidor($('medidor-consumo'));
+  // ⚠ A pastilha na ABA existe para o aviso não ficar escondido atrás de um
+  //    clique: o detalhe mora num lugar só, mas o SINAL aparece de qualquer
+  //    aba. Ela só acende a partir da segunda faixa — pastilha que fica acesa
+  //    sempre é pastilha que ninguém olha.
+  const mc = (RETRATO.painel && RETRATO.painel.consumo) || {};
+  const pc = $('pill-custos');
+  const grave = mc.faixa === 'estourado' ? 'vermelho' : (mc.faixa === 'aviso_2' || mc.faixa === 'aviso_3') ? 'ambar' : null;
+  pc.hidden = !grave;
+  if (grave) { pc.className = 'pill ' + grave; pc.textContent = `${String(mc.percentual).replace('.', ',')}%`; pc.title = mc.aviso || ''; }
   const c = RETRATO.custos || {}; const cu = c.custeio || {};
   const filtrado = !!(F.empresa || F.produto || F.fila);
   const passaC = (i) => (!F.empresa || i.empresa === F.empresa) && (!F.produto || (i.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, i.fila));
