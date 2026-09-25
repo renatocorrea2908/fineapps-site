@@ -161,6 +161,8 @@ label { display: block; font-size: .75rem; font-weight: 650; color: var(--tinta-
 .item .meta .tag { cursor: pointer; border-radius: 4px; padding: .1rem .25rem; margin: -.1rem -.25rem; }
 .item .meta .tag:hover { background: var(--marca-tinta); color: var(--marca); }
 .item .porque { font-size: .875rem; color: var(--tinta-2); margin: .5rem 0 0; }
+.item .pergunta { margin-top: .5rem; padding: .5rem .75rem; border-left: 3px solid var(--linha-2); }
+.item .pergunta .resposta { color: var(--tinta); font-weight: 500; }
 .item .descricao { white-space: pre-wrap; font-size: .875rem; margin: .6rem 0 0; padding-top: .6rem; border-top: 1px dashed var(--linha); }
 .item .falha { font-size: .85rem; margin: .6rem 0 0; padding: .5rem .75rem; background: var(--alerta-fundo); border-left: 3px solid var(--alerta); border-radius: 4px; white-space: pre-wrap; }
 button.item-cab { font: inherit; text-align: left; background: none; border: 0; padding: 0; margin: 0; color: var(--tinta); cursor: pointer; width: 100%; }

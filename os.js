@@ -369,7 +369,27 @@ function desenharAprov() {
     m.appendChild(dirA);
     cx.append(m, el('p', 'porque', p.porque_voce));
     if (i && i.descricao) { const d = el('details'); d.append(el('summary', null, 'Ver o pedido inteiro'), el('div', 'descricao', i.descricao)); cx.appendChild(d); }
-    if (p.classe === 'aguarda_alcada') cx.appendChild(caixaAcao(p, [['Aprovar', 'company_os_minha_aprovacao', 'p_observacao', { p_canal: 'tela-os' }]], 'Por que você está aprovando (mínimo 10 letras)'));
+    if (p.classe === 'aguarda_alcada') {
+      // (M455) A pergunta que o CEO já fez sobre este item, e a resposta quando
+      // ela chegou — o banco as guarda no item; a tela só mostra.
+      const pg = p.contexto && p.contexto.pergunta;
+      if (pg && pg.id) {
+        const q = el('div', 'pergunta');
+        q.appendChild(el('p', 'porque', `Você perguntou${pg.em ? ' em ' + quando(pg.em) : ''}: “${pg.texto || '—'}”`));
+        q.appendChild(pg.resposta
+          ? el('p', 'porque resposta', `Resposta${pg.respondida_em ? ' em ' + quando(pg.respondida_em) : ''}: ${pg.resposta}`)
+          : el('p', 'dica', pg.estado === 'cancelled' ? 'A pergunta foi cancelada.' : 'Sem resposta ainda — o COO responde pela oficina; a resposta também chega na aba Avisos.'));
+        cx.appendChild(q);
+      }
+      // ⚠ Três saídas, não uma: aprovar, reprovar (o NÃO com motivo — vai para
+      //    `cancelado` com rastro `rejected`) e questionar (abre pergunta ao COO
+      //    com este item como pai; o item continua aqui até você decidir).
+      cx.appendChild(caixaAcao(p, [
+        ['Aprovar', 'company_os_minha_aprovacao', 'p_observacao', { p_canal: 'tela-os' }],
+        ['Questionar', 'company_os_questionar', 'p_pergunta'],
+        ['Reprovar', 'company_os_reprovar', 'p_motivo', null, 'perigo'],
+      ], 'Motivo (para aprovar ou reprovar) ou a pergunta ao COO (para questionar) — mínimo 10 letras'));
+    }
     if (p.classe === 'entrega_aguarda_aceite') {
       const ref = (p.contexto && p.contexto.referencia) || '';
       if (/^https?:\/\//.test(ref)) { const a = el('a', 'ligacao', 'Abrir a entrega (PR) em nova aba'); a.href = ref; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
@@ -545,6 +565,13 @@ const TIPOS = {
   technical_debt: 'dívida técnica', infrastructure: 'infraestrutura', security: 'segurança',
   operational_incident: 'incidente', structural_change: 'mudança estrutural', capacity: 'capacidade',
   decision: 'decisão', product: 'produto',
+  // (M455) os 12 que faltavam — o catálogo é `company_os.tipos_de_trabalho` (23 tipos em 25/09);
+  // `analytical_research` é o tipo de toda pergunta do CEO ao COO e saía como "analytical research".
+  analytical_research: 'pergunta ao COO', cpi: 'melhoria contínua', exception: 'exceção',
+  financial_analysis: 'análise financeira', governance_approval: 'aprovação de governança',
+  maintenance: 'manutenção', market_analysis: 'análise de mercado', performance: 'desempenho',
+  policy_change: 'mudança de política', pricing: 'preço', process_improvement: 'melhoria de processo',
+  product_decision: 'decisão de produto', refactoring: 'refatoração',
 };
 const IMPACTOS = { none: null, low: 'impacto baixo', medium: 'impacto médio', high: 'impacto alto', critical: 'impacto crítico' };
 const PRIORIDADES = { critica: 'crítica', alta: 'alta', media: 'média', baixa: 'baixa' };
@@ -761,7 +788,10 @@ function desenharAvisos() {
       b.addEventListener('click', () => acaoAviso('company_os_dar_ciencia', { p_ids: [a.id] }, 'Ciência registrada.'))
       caixa.appendChild(b)
     }
-    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta já aberta ao COO.'))
+    // (M455) A resposta do COO chega como OUTRO aviso nesta fila (origem
+    //    `resposta-ao-ceo`) — é o único caminho que o CEO lê sem depender de
+    //    ninguém. O que a tela pode dizer aqui é que a pergunta existe e onde ela está.
+    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em CC › Filas.'))
     else {
       const inp = el('input'); inp.placeholder = 'Perguntar ao COO (mínimo 10 letras)'
       const b2 = el('button', 'btn', 'Perguntar')
