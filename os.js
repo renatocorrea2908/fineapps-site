@@ -394,7 +394,10 @@ function desenharAprov() {
       m.append(el('span', 'sit ok', e.concluida ? 'em produção' : 'aceita pelo CI — concluindo'),
                tag(e.empresa, 'empresa', e.empresa), tag(e.produto || 'sem produto', 'produto', e.produto || '— sem produto —'),
                tag(e.fila, 'fila', e.fila), el('span', 'div', '·'),
-               el('span', null, e.alcada === 'technical' || e.alcada === 'none' ? 'aceita pela régua técnica (7b)' : 'você aprovou na entrada (7c)'));
+               // (M452/C20) Quem diz se o nível exige alçada é o banco (`exige_alcada`, vindo do retrato),
+               // não uma lista aqui: esta linha era a 13ª cópia de `IN ('product','executive')`, em JS.
+               // Retrato antigo (sem a chave) não inventa resposta — fica em branco.
+               el('span', null, e.exige_alcada == null ? '' : (e.exige_alcada ? 'você aprovou na entrada (7c)' : 'aceita pela régua técnica (7b)')));
       const dirR = el('span', 'meta-dir'); dirR.appendChild(el('span', null, quando(e.aceita_em))); m.appendChild(dirR);
       cx.appendChild(m);
       if (/^https?:\/\//.test(e.referencia || '')) { const a = el('a', 'ligacao', 'Ver a entrega (PR)'); a.href = e.referencia; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
