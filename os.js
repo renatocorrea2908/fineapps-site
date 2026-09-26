@@ -19,9 +19,9 @@ const CHAVE_SESSAO = 'fineapps.os.sessao';
 let SESSAO = null;
 let RETRATO = null;
 let RELOGIO = null;
-let ABA = 'cc';
-let SUB = 'aprov';
-let ABERTOS = new Set();        // itens com a tarefa aberta
+const PAGINAS = ['inicio', 'aprov', 'avisos', 'status', 'filas', 'paths', 'monitor', 'custos', 'report', 'pedido'];
+let ABA = PAGINAS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inicio';
+let GAVETA = null;              // id do item aberto na gaveta de detalhe
 const F = {};                   // filtro cruzado: empresa, produto, fila, estado, natureza, quem, tipo, prioridade, pendente, caminho
 
 const $ = (id) => document.getElementById(id);
@@ -33,6 +33,80 @@ const quando = (t) => (t ? new Date(t).toLocaleString('pt-BR', { dateStyle: 'sho
 const el = (tag, cls, texto) => { const e = document.createElement(tag); if (cls) e.className = cls; if (texto != null) e.textContent = texto; return e; };
 
 function mostrar(alvo, texto, bom) { alvo.textContent = texto; alvo.className = 'aviso ' + (bom ? 'bom' : 'ruim'); alvo.hidden = false; }
+
+/* ── ícones ────────────────────────────────────────────────────────────────
+   Traço simples, desenhado aqui (sem biblioteca: o CSP é script-src 'self').
+   Círculo vira caminho para caber num formato só. */
+const circ = (cx, cy, r) => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+const ICONES = {
+  inicio: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+  aprovar: 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+  sino: 'M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  lista: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01',
+  org: 'M9 3h6v5H9zM3 16h6v5H3zM15 16h6v5h-6zM12 8v4M6 16v-2.5h12V16',
+  rota: circ(6, 19, 2.5) + circ(18, 5, 2.5) + 'M8.5 19h8a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7h8',
+  pulso: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  dinheiro: 'M12 2v20M17 5.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+  grafico: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
+  mais: 'M12 5v14M5 12h14',
+  sol: circ(12, 12, 4) + 'M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4',
+  lua: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z',
+  tela: 'M3 4h18v12H3zM8 20h8M12 16v4',
+  atualizar: 'M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5',
+  sair: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  x: 'M18 6 6 18M6 6l12 12',
+  filtro: 'M22 3H2l8 9.46V19l4 2v-8.54z',
+  alerta: 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01',
+  certo: circ(12, 12, 10) + 'M8.5 12.5l2.5 2.5 4.5-5',
+  relogio: circ(12, 12, 10) + 'M12 6v6l4 2',
+  raio: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z',
+  escudo: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
+  medidor: 'M12 14l4-4M3.34 19a10 10 0 1 1 17.32 0',
+  externo: 'M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6',
+  caixa: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+};
+function icone(nome) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('class', 'ico'); s.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(NS, 'path'); p.setAttribute('d', ICONES[nome] || ''); s.appendChild(p);
+  return s;
+}
+function pintarIcones(raiz) {
+  for (const e of (raiz || document).querySelectorAll('[data-icone]')) {
+    const nome = e.dataset.icone === 'tema' ? ({ claro: 'sol', escuro: 'lua', sistema: 'tela' })[temaEscolhido()] : e.dataset.icone;
+    e.replaceChildren(icone(nome));
+  }
+}
+
+/* ── tema: claro · escuro · seguir o sistema ─────────────────────────────── */
+const CHAVE_TEMA = 'fineapps.os.tema';
+const temaEscolhido = () => document.documentElement.getAttribute('data-tema-escolha') || 'sistema';
+const sistemaEscuro = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function aplicarTema(escolha) {
+  const escuro = escolha === 'escuro' || (escolha === 'sistema' && sistemaEscuro && sistemaEscuro.matches);
+  document.documentElement.setAttribute('data-theme', escuro ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-tema-escolha', escolha);
+  try { localStorage.setItem(CHAVE_TEMA, escolha); } catch { /* sem storage: vale só nesta aba */ }
+  for (const b of document.querySelectorAll('.tema-seg button')) b.setAttribute('aria-checked', String(b.dataset.tema === escolha));
+  const rot = { claro: 'Tema claro', escuro: 'Tema escuro', sistema: 'Tema do sistema' }[escolha];
+  for (const e of document.querySelectorAll('[data-tema-rotulo]')) e.textContent = rot;
+  pintarIcones(document);
+}
+const cicloTema = () => aplicarTema({ sistema: 'claro', claro: 'escuro', escuro: 'sistema' }[temaEscolhido()]);
+if (sistemaEscuro) sistemaEscuro.addEventListener('change', () => { if (temaEscolhido() === 'sistema') aplicarTema('sistema'); });
+document.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-tema-ciclo]'); if (c) { cicloTema(); return; }
+  const t = e.target.closest('.tema-seg button[data-tema]'); if (t) aplicarTema(t.dataset.tema);
+});
+
+/* ── aviso rápido no canto: confirma o que você fez sem mudar de lugar ───── */
+function toast(texto, bom = true) {
+  const t = el('div', 'toast' + (bom ? '' : ' ruim'));
+  t.append(icone(bom ? 'certo' : 'alerta'), el('span', null, texto));
+  $('toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('saindo'); setTimeout(() => t.remove(), 300); }, 3200);
+}
 
 /* ── sessão: sobrevive ao refresh ──────────────────────────────────────────
    O token fica no localStorage deste navegador; "Sair" apaga. Foi decisão do
@@ -98,7 +172,12 @@ $('form-login').addEventListener('submit', async (e) => {
 });
 
 $('sair').addEventListener('click', () => { if (RELOGIO) clearInterval(RELOGIO); apagarSessao(); location.reload(); });
-$('atualizar').addEventListener('click', () => abrirCasa().catch((e) => alert(e.message)));
+$('atualizar').addEventListener('click', atualizarAgora);
+async function atualizarAgora() {
+  const b = $('atualizar'); b.classList.add('girando');
+  try { await abrirCasa(); toast('Retrato atualizado.'); } catch (e) { toast(String(e.message || e), false); }
+  finally { b.classList.remove('girando'); }
+}
 
 /* ── abrir a casa ─────────────────────────────────────────────────────────── */
 // ⚠ (D-14) A TERCEIRA FILA vem numa chamada PRÓPRIA, e não dentro do retrato.
@@ -122,21 +201,42 @@ async function abrirCasa() {
   }
   RETRATO = retrato;
   $('entrada').hidden = true; $('app').hidden = false;
-  $('quem').textContent = `${SESSAO.user.email} · alçada executiva`;
-  $('carimbo').textContent = `retrato de ${quando(retrato.gerado_em)} · atualiza a cada minuto`;
+  const email = SESSAO.user.email || '';
+  $('quem').textContent = `${email} · alçada executiva`;
+  $('quem-nome').textContent = email.startsWith('renato') ? 'Renato Correa' : email.split('@')[0];
+  $('avatar').textContent = ($('quem-nome').textContent || '?').trim().charAt(0).toUpperCase();
+  pintarCarimbo();
   montarSeletores();
   render();
-  if (!RELOGIO) RELOGIO = setInterval(() => { abrirCasa().catch(() => {}); }, 60_000);
+  if (!RELOGIO) { RELOGIO = setInterval(() => { abrirCasa().catch(() => {}); }, 60_000); setInterval(pintarCarimbo, 10_000); }
+}
+/* "há 40 s" responde se o que você está vendo é de agora; a bolinha fica âmbar
+   quando o retrato passa de 3 minutos (a atualização automática falhou). */
+function pintarCarimbo() {
+  if (!RETRATO) return;
+  const s = Math.max(0, Math.round((Date.now() - new Date(RETRATO.gerado_em)) / 1000));
+  const txt = s < 60 ? `atualizado há ${s} s` : s < 3600 ? `atualizado há ${Math.round(s / 60)} min` : `retrato de ${quando(RETRATO.gerado_em)}`;
+  $('carimbo-txt').textContent = txt;
+  $('carimbo').classList.toggle('velho', s > 180);
+  $('carimbo').title = `Retrato gerado em ${quando(RETRATO.gerado_em)} · atualiza sozinho a cada minuto`;
 }
 
 async function boot() {
   const s = lerSessao();
   if (!s) return;
   SESSAO = s;
+  $('entrada').hidden = true; $('app').hidden = false; esqueleto(); mostrarAba();
   try {
     if (!SESSAO.expira_em || SESSAO.expira_em - 60_000 < Date.now()) await renovar();
     await abrirCasa();
-  } catch { apagarSessao(); $('entrada').hidden = false; }
+  } catch { apagarSessao(); $('entrada').hidden = false; $('app').hidden = true; }
+}
+function esqueleto() {
+  const k = $('kpis-inicio'); k.replaceChildren();
+  for (let n = 0; n < 6; n++) { const d = el('div', 'kpi esqueleto'); d.style.height = '6.3rem'; k.appendChild(d); }
+  for (const id of ['inicio-aprov', 'inicio-executor', 'inicio-dist', 'inicio-avisos']) {
+    const d = el('div', 'esqueleto'); d.style.height = '9rem'; d.style.margin = '0 1.2rem 1.1rem'; $(id).replaceChildren(d);
+  }
 }
 
 /* ── filtro cruzado ───────────────────────────────────────────────────────── */
@@ -192,6 +292,8 @@ function desenharChips() {
   }
   $('f-empresa').value = F.empresa || '';
   $('f-produto').value = F.produto || '';
+  $('f-empresa').classList.toggle('ativo', !!F.empresa);
+  $('f-produto').classList.toggle('ativo', !!F.produto);
   $('limpar').hidden = Object.keys(F).length === 0;
 }
 
@@ -233,20 +335,56 @@ function montarProdutosDoPedido() {
 $('p-empresa').addEventListener('change', montarProdutosDoPedido);
 
 /* ── abas ─────────────────────────────────────────────────────────────────── */
-$('abas').addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-aba]'); if (!b) return;
-  ABA = b.dataset.aba; mostrarAba();
+/* ⚠ Uma página por assunto, na lateral — as abas de dentro de abas (Command
+   Center › Aprovações/Status/Filas/Paths) viraram páginas de primeiro nível:
+   o que se decide fica a um clique, não a dois. A página vai no endereço
+   (#aprov), então o refresh volta onde você estava e o "voltar" funciona. */
+const TITULOS = {
+  inicio: ['Visão geral', 'O que precisa de você, o que está andando e quanto custa — num olhar'],
+  aprov: ['Aprovações', 'Itens que não andam até você decidir'],
+  avisos: ['Avisos', 'O que você precisa saber e não exige decisão sua'],
+  status: ['Itens', 'Tudo o que está em aberto, por situação'],
+  filas: ['Organograma', 'Quem carrega o quê, ao vivo'],
+  paths: ['Caminhos', 'O percurso de cada item — e onde ele desviou'],
+  monitor: ['Monitor', 'As réguas do sistema, as rampas de autonomia e o executor'],
+  custos: ['Custos', 'Quanto você paga, quanto falta para o limite e onde foi parar'],
+  report: ['Report', 'Recorte por período, fila, quem abriu e natureza'],
+  pedido: ['Novo pedido', 'Entra assinado por você; a Triagem classifica e roteia'],
+};
+function irPara(aba) { if (!PAGINAS.includes(aba)) return; ABA = aba; if (GAVETA) { GAVETA = null; desenharGaveta(); } mostrarAba(); window.scrollTo({ top: 0 }); }
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-aba]:not(section)'); if (b) { irPara(b.dataset.aba); return; }
+  const ir = e.target.closest('[data-ir]'); if (ir) irPara(ir.dataset.ir);
 });
-$('subabas').addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-sub]'); if (!b) return;
-  SUB = b.dataset.sub; mostrarAba();
-});
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (PAGINAS.includes(h) && h !== ABA) { ABA = h; mostrarAba(); } });
 function mostrarAba() {
-  for (const b of $('abas').querySelectorAll('button')) b.setAttribute('aria-selected', String(b.dataset.aba === ABA));
-  for (const s of document.querySelectorAll('.aba')) s.hidden = s.dataset.aba !== ABA;
-  for (const b of $('subabas').querySelectorAll('button')) b.setAttribute('aria-selected', String(b.dataset.sub === SUB));
-  for (const s of document.querySelectorAll('.sub[data-sub]')) s.hidden = s.dataset.sub !== SUB;
+  for (const b of $('abas').querySelectorAll('button[data-aba]')) b.setAttribute('aria-selected', String(b.dataset.aba === ABA));
+  for (const s of document.querySelectorAll('section.aba')) s.hidden = s.dataset.aba !== ABA;
+  const [t, sub] = TITULOS[ABA] || ['', ''];
+  $('titulo-pagina').textContent = t; $('sub-pagina').textContent = sub;
+  document.title = `${t} — Command Center`;
+  if (location.hash.slice(1) !== ABA) history.replaceState(null, '', '#' + ABA);
+  fecharMenu();
 }
+function abrirMenu() { $('lateral').classList.add('aberta'); $('veu').hidden = false; }
+function fecharMenu() { $('lateral').classList.remove('aberta'); $('veu').hidden = true; }
+$('abrir-menu').addEventListener('click', abrirMenu);
+$('fechar-menu').addEventListener('click', fecharMenu);
+$('veu').addEventListener('click', fecharMenu);
+
+/* ── atalhos: 1–9 páginas, N novo pedido, R atualizar, T tema, Esc fecha ── */
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const alvo = e.target; const digitando = alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
+  if (e.key === 'Escape') { if (GAVETA) fecharGaveta(); else fecharMenu(); if (digitando) alvo.blur(); return; }
+  if (digitando || $('app').hidden) return;
+  const n = Number(e.key);
+  if (n >= 1 && n <= 9) { irPara(PAGINAS[n - 1]); e.preventDefault(); return; }
+  const k = e.key.toLowerCase();
+  if (k === 'n') { irPara('pedido'); setTimeout(() => $('p-titulo').focus(), 50); e.preventDefault(); }
+  else if (k === 'r') { atualizarAgora(); e.preventDefault(); }
+  else if (k === 't') { cicloTema(); e.preventDefault(); }
+});
 
 /* ── vocabulário ──────────────────────────────────────────────────────────── */
 const ESTADOS = [
@@ -292,8 +430,9 @@ function tag(rotulo, chave, valor) {
   return s;
 }
 function cartaoItem(i, opts = {}) {
-  const cx = el('article', 'item' + (pendente(i) && aberto(i) ? ' espera' : '') + (ABERTOS.has(i.id) ? ' aberto' : ''));
-  const cab = el('button', 'item-cab'); cab.setAttribute('aria-expanded', String(ABERTOS.has(i.id)));
+  const tom = tomDoItem(i);
+  const cx = el('article', 'item clicavel' + (tom === 'parado' ? ' urgente' : pendente(i) && aberto(i) ? ' espera' : '') + (GAVETA === i.id ? ' aberto' : ''));
+  const cab = el('button', 'item-cab'); cab.setAttribute('aria-haspopup', 'dialog'); cab.title = 'Abrir o detalhe';
   cab.appendChild(el('h4', null, i.titulo));
   const m = el('div', 'meta');
   // ⚠ A situação primeiro, e colorida: é ela que decide se você para neste
@@ -314,16 +453,60 @@ function cartaoItem(i, opts = {}) {
   if (Number(i.gasto) > 0) dir.appendChild(el('span', 'dinheiro', moeda(i.gasto)));
   m.appendChild(dir);
   cab.appendChild(m);
-  cab.addEventListener('click', () => { if (ABERTOS.has(i.id)) ABERTOS.delete(i.id); else ABERTOS.add(i.id); render(); });
+  cab.addEventListener('click', () => abrirGaveta(i.id));
   cx.appendChild(cab);
-  if (ABERTOS.has(i.id)) {
-    cx.appendChild(el('div', 'descricao', i.descricao || '(este item não tem descrição registrada)'));
-    if (i.ultima_falha) cx.appendChild(el('p', 'falha', `Última falha (${quando(i.ultima_falha_em)}): ${i.ultima_falha}`));
-    if (opts.comPath !== false) cx.appendChild(desenharPath(i));
-  }
   if (opts.rodape) cx.appendChild(opts.rodape);
+  return subirDir(cx);
+}
+/* ⚠ Data e dinheiro sobem para a linha do TÍTULO, à direita. Dentro da linha
+   de etiquetas eles colidiam com a situação quando ela era longa ("já falhou
+   1× — restam 2 tentativas" passava por cima da data). */
+function subirDir(cx) {
+  const dir = cx.querySelector('.meta-dir'); const h = cx.querySelector('h4');
+  if (!dir || !h) return cx;
+  const topo = el('div', 'item-topo'); h.replaceWith(topo); topo.append(h, dir);
   return cx;
 }
+
+/* ── a gaveta: o detalhe do item abre de lado, sem tirar você da lista ───── */
+function abrirGaveta(id) { GAVETA = id; desenharGaveta(); render(); }
+function fecharGaveta() { GAVETA = null; desenharGaveta(); render(); }
+$('fechar-gaveta').addEventListener('click', fecharGaveta);
+$('veu-gaveta').addEventListener('click', fecharGaveta);
+function desenharGaveta() {
+  const g = $('gaveta'); const i = GAVETA && RETRATO ? todosItens().find((x) => x.id === GAVETA) : null;
+  if (GAVETA && RETRATO && !i) GAVETA = null;    // o item saiu do retrato: a gaveta fecha sozinha
+  g.classList.toggle('aberta', !!i); g.setAttribute('aria-hidden', String(!i)); $('veu-gaveta').hidden = !i;
+  const c = $('gaveta-corpo'); c.replaceChildren(); if (!i) return;
+  c.appendChild(el('span', 'sit ' + tomDoItem(i), situacao(i)));
+  const h = el('h2', null, i.titulo); h.id = 'gaveta-titulo'; c.appendChild(h);
+  const ficha = el('dl', 'ficha');
+  const par = (rot, valor, chave, filtro) => {
+    if (valor == null || valor === '') return;
+    ficha.appendChild(el('dt', null, rot));
+    const dd = el('dd'); dd.appendChild(chave ? tag(valor, chave, filtro === undefined ? valor : filtro) : document.createTextNode(valor)); ficha.appendChild(dd);
+  };
+  par('Empresa', i.empresa, 'empresa');
+  par('Produto', i.produto || 'sem produto', 'produto', i.produto || '— sem produto —');
+  par('Fila', i.fila, 'fila'); par('Squad', i.squad, 'squad');
+  par('Tipo', rotuloTipo(i.tipo), 'tipo', i.tipo);
+  par('Prioridade', PRIORIDADES[i.prioridade] || i.prioridade, 'prioridade', i.prioridade);
+  par('Impacto', IMPACTOS[i.impacto] ? IMPACTOS[i.impacto].replace('impacto ', '') : null);
+  par('Natureza', i.natureza, 'natureza');
+  par('Quem abriu', i.quem_abriu, 'quem');
+  par('Executor', i.executor, 'executor');
+  par('Aberto em', quando(i.criado)); par('Última mudança', i.atualizado ? quando(i.atualizado) : null);
+  if (i.concluido) par('Concluído em', quando(i.concluido));
+  if (Number(i.gasto) > 0) par('Consumo', moeda(i.gasto));
+  if (i.tentativas) par('Tentativas', tentativasTexto(i));
+  c.appendChild(ficha);
+  c.appendChild(el('h3', null, 'O pedido'));
+  c.appendChild(el('div', 'descricao', i.descricao || '(este item não tem descrição registrada)'));
+  if (i.ultima_falha) { c.appendChild(el('h3', null, 'Última falha')); c.appendChild(el('p', 'falha', `${quando(i.ultima_falha_em)} — ${i.ultima_falha}`)); }
+  c.appendChild(el('h3', null, 'Caminho'));
+  const p = desenharPath(i); const d = p.querySelector('details'); if (d) d.open = true; c.appendChild(p);
+}
+
 function listar(alvo, lista, opts) {
   alvo.replaceChildren();
   if (!lista.length) { alvo.appendChild(el('p', 'vazio', opts && opts.vazio || 'Nada aqui com os filtros atuais.')); return; }
@@ -338,16 +521,18 @@ function desenharAprov() {
   const lista = ((RETRATO.inbox && RETRATO.inbox.itens) || []).filter((p) => { const i = porId.get(p.id); return !i || passa(i); });
   const total = (RETRATO.inbox && RETRATO.inbox.total) || 0;
   $('pill-aprov').textContent = String(total);
-  $('pill-aprov').className = 'pill' + (total ? ' vermelho' : '');
+  $('pill-aprov').className = 'pill' + (total ? ' vermelho' : ''); $('pill-aprov').hidden = !total;
   $('sub-aprov').textContent = lista.length === 0
     ? (total ? 'Nada com os filtros atuais.' : 'Nada espera por você. A fila anda sozinha.')
     : `${lista.length} item(ns) não andam até você decidir. Em ordem de quem espera há mais tempo.`;
   const alvo = $('lista-aprov'); alvo.replaceChildren();
-  if (!lista.length) alvo.appendChild(el('p', 'vazio', 'Aprovações limpas.'));
+  if (!lista.length) alvo.appendChild(vazioGrande('Aprovações limpas', total ? 'Nada com os filtros atuais.' : 'Nada espera por você. A fila anda sozinha.'));
   for (const p of (lista.length ? lista : [])) {
     const i = porId.get(p.id);
-    const cx = el('article', 'item espera');
-    cx.appendChild(el('h4', null, p.titulo));
+    const cx = el('article', 'item ' + (Number(p.dias_esperando) >= 2 ? 'urgente' : 'espera'));
+    cx.id = 'aprov-' + p.id;
+    if (i) { const cab = el('button', 'item-cab'); cab.title = 'Abrir o detalhe'; cab.appendChild(el('h4', null, p.titulo)); cab.addEventListener('click', () => abrirGaveta(i.id)); cx.appendChild(cab); }
+    else cx.appendChild(el('h4', null, p.titulo));
     const m = el('div', 'meta');
     // ⚠ Aprovações montava o próprio cartão e por isso ficou de fora da
     //    primeira passada — a aba mais importante da tela seguia com a linha
@@ -362,12 +547,11 @@ function desenharAprov() {
     const dirA = el('span', 'meta-dir');
     // ⚠ "2 dia(s) esperando" é o número que ordena esta lista: fica à direita,
     //    alinhado com os outros, e em âmbar a partir de 2 dias.
-    const esp = el('span', Number(p.dias_esperando) >= 2 ? 'dinheiro' : null, `${p.dias_esperando} dia(s) esperando`);
-    if (Number(p.dias_esperando) >= 2) esp.style.color = 'var(--alerta)';
+    const esp = el('span', Number(p.dias_esperando) >= 2 ? 'quente' : null, esperaTexto(p.dias_esperando));
     dirA.appendChild(esp);
     if (Number(p.custo_ja_gasto) > 0) dirA.appendChild(el('span', 'dinheiro', moeda(p.custo_ja_gasto)));
     m.appendChild(dirA);
-    cx.append(m, el('p', 'porque', p.porque_voce));
+    cx.append(m, el('p', 'porque', p.porque_voce)); subirDir(cx);
     if (i && i.descricao) { const d = el('details'); d.append(el('summary', null, 'Ver o pedido inteiro'), el('div', 'descricao', i.descricao)); cx.appendChild(d); }
     if (p.classe === 'aguarda_alcada') {
       // (M455) A pergunta que o CEO já fez sobre este item, e a resposta quando
@@ -392,7 +576,7 @@ function desenharAprov() {
     }
     if (p.classe === 'entrega_aguarda_aceite') {
       const ref = (p.contexto && p.contexto.referencia) || '';
-      if (/^https?:\/\//.test(ref)) { const a = el('a', 'ligacao', 'Abrir a entrega (PR) em nova aba'); a.href = ref; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
+      if (/^https?:\/\//.test(ref)) { const a = el('a', 'ligacao', 'Abrir a entrega (PR) em nova aba'); a.appendChild(icone('externo')); a.href = ref; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
       else if (ref) cx.appendChild(el('p', 'porque', 'Evidência: ' + ref));
       if (p.contexto && p.contexto.detalhe) cx.appendChild(el('p', 'porque', p.contexto.detalhe));
       cx.appendChild(caixaAcao(p, [['Aceitar entrega', 'company_os_aceitar_entrega', 'p_observacao'], ['Recusar', 'company_os_recusar_entrega', 'p_motivo', null, 'perigo']],
@@ -419,8 +603,8 @@ function desenharAprov() {
                // Retrato antigo (sem a chave) não inventa resposta — fica em branco.
                el('span', null, e.exige_alcada == null ? '' : (e.exige_alcada ? 'você aprovou na entrada (7c)' : 'aceita pela régua técnica (7b)')));
       const dirR = el('span', 'meta-dir'); dirR.appendChild(el('span', null, quando(e.aceita_em))); m.appendChild(dirR);
-      cx.appendChild(m);
-      if (/^https?:\/\//.test(e.referencia || '')) { const a = el('a', 'ligacao', 'Ver a entrega (PR)'); a.href = e.referencia; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
+      cx.appendChild(m); subirDir(cx);
+      if (/^https?:\/\//.test(e.referencia || '')) { const a = el('a', 'ligacao', 'Ver a entrega (PR)'); a.appendChild(icone('externo')); a.href = e.referencia; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
       alvo.appendChild(cx);
     }
   }
@@ -438,6 +622,7 @@ function caixaAcao(p, botoes, placeholder) {
         const corpo = { p_work_item_id: p.id, ...(extra || {}) }; corpo[campoNome] = campo.value.trim();
         await rpc(fn, corpo);
         await abrirCasa();       // quem decide se saiu da lista é o banco, não o JavaScript
+        toast(`${rot}: registrado.`);
       } catch (err) { mostrar(msg, String(err.message || err), false); for (const x of bs) x.disabled = false; }
     });
     bs.push(b);
@@ -468,9 +653,10 @@ function desenharStatus() {
     bd.appendChild(b);
   }
   const lista = itens().filter((i) => F.estado ? true : aberto(i)).sort((a, b) => new Date(b.atualizado || b.criado) - new Date(a.atualizado || a.criado));
+  // (o texto abaixo continua dizendo onde clicar: agora o título abre o detalhe ao lado)
   // ⚠ A dica é texto de seção, não item: numa grade ela roubava uma célula e
   //    abria um buraco no canto. Atravessa as colunas.
-  $('lista-status').replaceChildren(el('p', 'dica larga', F.estado ? `${lista.length} item(ns) em "${rotuloEstado(F.estado)}" · clique no título para ler a tarefa` : `${lista.length} em aberto · clique num status para ver a composição · clique no título para ler a tarefa`));
+  $('lista-status').replaceChildren(el('p', 'dica larga', F.estado ? `${lista.length} item(ns) em "${rotuloEstado(F.estado)}" · clique no título para abrir o detalhe` : `${lista.length} em aberto · clique numa situação para filtrar · clique no título para abrir o detalhe`));
   for (const i of lista) $('lista-status').appendChild(cartaoItem(i));
   if (!lista.length) $('lista-status').appendChild(el('p', 'vazio', 'Nada aqui com os filtros atuais.'));
 }
@@ -550,7 +736,7 @@ function desenharOrg() {
 
   const lista = itens().filter(aberto).sort((a, b) => (pendente(b) - pendente(a)) || new Date(b.atualizado) - new Date(a.atualizado));
   const alvo = $('lista-filas'); alvo.replaceChildren();
-  alvo.appendChild(el('p', 'dica', (F.fila || F.produto || F.pendente) ? `${lista.length} item(ns) na seleção · clique no título para ler a tarefa` : 'Clique numa caixa para ver a composição. Abaixo, tudo o que está em aberto.'));
+  alvo.appendChild(el('p', 'dica larga', (F.fila || F.produto || F.pendente) ? `${lista.length} item(ns) na seleção · clique no título para abrir o detalhe` : 'Clique numa caixa para filtrar. Abaixo, tudo o que está em aberto.'));
   for (const i of lista) alvo.appendChild(cartaoItem(i));
   if (!lista.length) alvo.appendChild(el('p', 'vazio', 'Nada em aberto aqui.'));
 }
@@ -655,7 +841,8 @@ $('form-pedido').addEventListener('submit', async (e) => {
       p_titulo: $('p-titulo').value.trim(), p_descricao: $('p-desc').value.trim(), p_prioridade: $('p-prio').value,
       p_empresa: $('p-empresa').value, p_produto: $('p-produto').value || null,
     });
-    mostrar($('msg-pedido'), 'Pedido aberto e assinado por você. A Triagem classifica e roteia em instantes; ele aparece em Status assim que virar item.', true);
+    mostrar($('msg-pedido'), 'Pedido aberto e assinado por você. A Triagem classifica e roteia em instantes; ele aparece em Itens assim que virar item.', true);
+    toast('Pedido aberto.');
     $('p-titulo').value = ''; $('p-desc').value = '';
     await abrirCasa();
   } catch (err) { mostrar($('msg-pedido'), String(err.message || err), false); }
@@ -667,17 +854,19 @@ function desenharPedido() {
 }
 
 /* ── ABA Monitor ──────────────────────────────────────────────────────────── */
-function kpi(alvo, rot, val, sub, cls, onClick, pressed) {
+function kpi(alvo, rot, val, sub, cls, onClick, pressed, ico) {
   const d = el(onClick ? 'button' : 'div', 'kpi' + (cls ? ' ' + cls : '') + (onClick ? ' clicavel' : ''));
   if (onClick) { d.addEventListener('click', onClick); d.setAttribute('aria-pressed', String(!!pressed)); }
-  d.append(el('div', 'r', rot), el('div', 'v', val)); if (sub) d.appendChild(el('div', 's', sub));
+  const r = el('div', 'r'); if (ico) r.appendChild(icone(ico)); r.appendChild(document.createTextNode(rot));
+  d.append(r, el('div', 'v', val)); if (sub) d.appendChild(el('div', 's', sub));
   alvo.appendChild(d);
+  return d;
 }
 function linhas(alvo, pares) {
   alvo.replaceChildren();
   for (const [k, v, onClick, pressed] of pares) {
     const l = el('div', 'linha' + (onClick ? ' clicavel' : '')); l.append(el('span', null, k), el('span', 'd', v));
-    if (onClick) { l.addEventListener('click', onClick); if (pressed) l.style.background = 'var(--marca-tinta)'; }
+    if (onClick) { l.addEventListener('click', onClick); if (pressed) l.classList.add('ativa'); }
     alvo.appendChild(l);
   }
   if (!pares.length) alvo.appendChild(el('p', 'vazio', 'Nada.'));
@@ -739,7 +928,8 @@ function desenharMedidor(alvo) {
 async function acaoAviso(fn, corpo, msg) {
   try {
     await rpc(fn, corpo)
-    mostrar($('msg-avisos'), msg, true)
+    $('msg-avisos').hidden = true
+    toast(msg)
     await abrirCasa()
   } catch (e) { mostrar($('msg-avisos'), String(e.message || e), false) }
 }
@@ -758,7 +948,7 @@ function desenharAvisos() {
   $('dica-ciencia').textContent = novos.length ? `${novos.length} aviso(s) — ciência é só "eu li".` : ''
 
   const alvo = $('lista-avisos'); alvo.replaceChildren()
-  if (!lista.length) { alvo.appendChild(el('p', 'vazio', 'Fila de avisos limpa.')); return }
+  if (!lista.length) { alvo.appendChild(vazioGrande('Fila de avisos limpa', 'Quando o sistema parar por algo que você não precisa decidir, ele conta aqui.')); return }
 
   for (const a of lista) {
     const cx = el('article', 'item' + (a.visto_em ? ' info' : ' espera'))
@@ -772,7 +962,7 @@ function desenharAvisos() {
     m.appendChild(el('span', null, a.origem))
     const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, quando(a.criado_em)))
     m.appendChild(dir)
-    cx.appendChild(m)
+    cx.appendChild(m); subirDir(cx)
     // ⚠ O corpo inteiro, sem cortar: ele diz o que mudou, o que já foi tentado
     //    e o que acontece se nada for feito. Cortar isso devolveria ao CEO a
     //    tarefa em vez da decisão, que é o §10.2 ao contrário.
@@ -791,7 +981,7 @@ function desenharAvisos() {
     // (M455) A resposta do COO chega como OUTRO aviso nesta fila (origem
     //    `resposta-ao-ceo`) — é o único caminho que o CEO lê sem depender de
     //    ninguém. O que a tela pode dizer aqui é que a pergunta existe e onde ela está.
-    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em CC › Filas.'))
+    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em Organograma.'))
     else {
       const inp = el('input'); inp.placeholder = 'Perguntar ao COO (mínimo 10 letras)'
       const b2 = el('button', 'btn', 'Perguntar')
@@ -822,8 +1012,8 @@ function desenharMonitor() {
   $('pill-monitor').hidden = vig.vermelhos.length === 0; $('pill-monitor').textContent = String(vig.vermelhos.length); $('pill-monitor').className = 'pill vermelho';
   const k = $('kpis-monitor'); k.replaceChildren();
   kpi(k, 'Réguas verdes', `${num(vig.total - vig.vermelhos.length)}/${num(vig.total)}`, vig.vermelhos.length ? 'vermelhas: ' + vig.vermelhos.join(', ') : 'promoção liberada', vig.vermelhos.length ? 'atencao' : 'ok');
-  kpi(k, 'Em execução agora', num((p.em_execucao || []).length), (p.em_execucao || []).map((i) => i.executor).join(', ') || 'executor ocioso', (p.em_execucao || []).length ? 'ok' : '', () => { ABA = 'cc'; SUB = 'status'; F.estado = 'in_progress'; mostrarAba(); render(); });
-  kpi(k, 'Esperando a vez', num((p.na_fila || []).length), (p.na_fila || []).some((i) => i.ultima_falha) ? 'há item que já falhou' : 'na fila', '', () => { ABA = 'cc'; SUB = 'status'; F.estado = 'ready'; mostrarAba(); render(); });
+  kpi(k, 'Em execução agora', num((p.em_execucao || []).length), (p.em_execucao || []).map((i) => i.executor).join(', ') || 'executor ocioso', (p.em_execucao || []).length ? 'ok' : '', () => { F.estado = 'in_progress'; irPara('status'); render(); });
+  kpi(k, 'Esperando a vez', num((p.na_fila || []).length), (p.na_fila || []).some((i) => i.ultima_falha) ? 'há item que já falhou' : 'na fila', '', () => { F.estado = 'ready'; irPara('status'); render(); });
   kpi(k, 'Parados há mais de 2h', num(parados), 'sem executor, sem despacho', parados ? 'atencao' : 'ok');
   kpi(k, 'Pedidos sem triagem', num(semTriagem), 'há mais de 2h', semTriagem ? 'atencao' : 'ok');
   const os29 = inv.find((i) => i.id === 'OS29'); const rampaParada = (os29 && os29.detalhes && os29.detalhes.parados || []).length;
@@ -831,13 +1021,25 @@ function desenharMonitor() {
   kpi(k, 'Último despacho', p.ultimo_despacho ? hhmm(p.ultimo_despacho) : '—', p.ultimo_despacho ? dia(p.ultimo_despacho) : 'o banco ainda não acordou o executor');
 
   $('sub-reguas').textContent = vig.vermelhos.length === 0 ? 'todas verdes — o CI lê estas mesmas réguas contra a produção a cada push' : `${vig.vermelhos.length} vermelha(s): os números do painel podem não valer nada até ficarem verdes`;
+  // ⚠ 47 linhas iguais escondiam a que importa. Agora: um quadradinho por
+  //    régua (o todo num olhar), as vermelhas abertas no topo, as verdes
+  //    recolhidas atrás de um clique — nenhuma some.
+  const sd = $('saude-reguas'); sd.replaceChildren();
+  for (const i of inv) { const q = el('span', i.passou ? '' : 'v'); q.title = `${i.id} — ${i.passou ? 'verde' : 'VERMELHA'}: ${i.descricao}`; sd.appendChild(q); }
   const rg = $('reguas'); rg.replaceChildren();
-  for (const i of inv) {
+  const regua = (i) => {
     const d = el('div', 'regua' + (i.passou ? '' : ' v'));
     d.append(el('span', 'cod', i.id));
     const t = el('div'); t.appendChild(el('div', 'txt', i.descricao));
     if (!i.passou) { const dt = el('details'); dt.append(el('summary', null, 'detalhes'), el('pre', null, JSON.stringify(i.detalhes, null, 2))); t.appendChild(dt); }
-    d.appendChild(t); rg.appendChild(d);
+    d.appendChild(t); return d;
+  };
+  for (const i of inv.filter((x) => !x.passou)) rg.appendChild(regua(i));
+  const verdes = inv.filter((x) => x.passou);
+  if (verdes.length) {
+    const det = el('details', 'reguas-verdes'); det.appendChild(el('summary', null, `Ver as ${verdes.length} verdes`));
+    for (const i of verdes) det.appendChild(regua(i));
+    rg.appendChild(det);
   }
   desenharRampas();
   linhas($('mon-executor'), (p.despachos || []).slice(0, 10).map((d) => [
@@ -854,16 +1056,21 @@ const RAMPAS_TEXTO = { '7b': ['7b — tema técnico não volta ao CEO', 'Ligada:
 function desenharRampas() {
   const pr = $('painel-rampas'); if (!pr) return; pr.replaceChildren();
   const rampas = (RETRATO.estrutura && RETRATO.estrutura.rampas) || [];
-  if (!rampas.length) { pr.appendChild(el('p', 'motivo', 'Nenhuma rampa declarada.')); return; }
+  if (!rampas.length) { pr.appendChild(el('p', 'dica', 'Nenhuma rampa declarada.')); return; }
   for (const r of rampas) {
     const [tit, expl] = RAMPAS_TEXTO[r.nome] || [r.nome, ''];
-    const cab = el('div', 'atual'); const luz = el('span', 'luz' + (r.ligada ? ' on' : '')); cab.append(luz, document.createTextNode(`${tit}: ${r.ligada ? 'LIGADA' : 'desligada'}`));
-    pr.append(cab, el('p', 'motivo', expl), el('p', 'motivo', `${r.motivo} — ${quando(r.mudada_em)}`));
+    const bloco = el('div', 'rampa');
+    const cab = el('div', 'rampa-cab'); cab.append(el('b', null, tit), el('span', 'sit ' + (r.ligada ? 'ok' : ''), r.ligada ? 'Ligada' : 'Desligada'));
+    bloco.appendChild(cab);
+    if (expl) bloco.appendChild(el('p', null, expl));
+    bloco.appendChild(el('p', 'motivo-fonte', `${r.motivo} — ${quando(r.mudada_em)}`));
+    const mudar = el('details'); mudar.appendChild(el('summary', null, r.ligada ? 'Desligar esta rampa…' : 'Ligar esta rampa…'));
+    bloco.appendChild(mudar); pr.appendChild(bloco);
     const form = el('div', 'acao-caixa');
     const motivo = el('input'); motivo.type = 'text'; motivo.placeholder = (r.ligada ? 'Por que desligar' : 'Por que ligar') + ' (mínimo 10 letras)';
     const b = el('button', 'btn ' + (r.ligada ? 'perigo' : 'sec'), r.ligada ? 'Desligar rampa' : 'Ligar rampa'); const msg = el('p', 'aviso'); msg.hidden = true;
-    b.addEventListener('click', async () => { b.disabled = true; try { await rpc('company_os_ligar_rampa', { p_nome: r.nome, p_ligada: !r.ligada, p_motivo: motivo.value.trim() }); await abrirCasa(); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
-    form.append(motivo, b, msg); pr.appendChild(form);
+    b.addEventListener('click', async () => { b.disabled = true; try { await rpc('company_os_ligar_rampa', { p_nome: r.nome, p_ligada: !r.ligada, p_motivo: motivo.value.trim() }); await abrirCasa(); toast(`Rampa ${r.nome} ${r.ligada ? 'desligada' : 'ligada'}.`); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
+    form.append(motivo, b, msg); mudar.appendChild(form);
   }
 }
 
@@ -916,18 +1123,30 @@ function desenharCustos() {
   const cab = el('tr'); for (const [h, n] of [['Fila', 0], ['Tarefas', 1], ['Rodadas', 1], ['Consumo', 1], ['Custo real', 1]]) cab.appendChild(el('th', n ? 'n' : '', h)); t.appendChild(cab);
   for (const f of filas) {
     const dos = itensC.filter((i) => i.fila === f); if (!dos.length && F.fila && !bate(F.fila, f)) continue;
-    const l = el('tr', 'clicavel'); if (bate(F.fila, f)) l.style.background = 'var(--marca-tinta)';
+    const l = el('tr', 'clicavel' + (bate(F.fila, f) ? ' ativa' : ''));
     l.append(el('td', null, f), el('td', 'n', num(dos.length)), el('td', 'n', num(dos.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.consumo || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.custo_real || 0), 0))));
     l.addEventListener('click', () => alternar('fila', f)); t.appendChild(l);
   }
   const tot = el('tr', 'total'); tot.append(el('td', null, 'Total'), el('td', 'n', num(itensC.length)), el('td', 'n', num(itensC.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(consumoF)), el('td', 'n', moeda(realF))); t.appendChild(tot);
+  // A mesma soma da tabela, desenhada: uma medida, uma régua, o rótulo no texto.
+  const bf = $('barras-filas'); bf.replaceChildren();
+  const porFila = filas.map((f) => [f, itensC.filter((i) => i.fila === f).reduce((s, i) => s + Number(i.custo_real || 0), 0)]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const maxF = Math.max(0, ...porFila.map(([, v]) => v));
+  for (const [f, v] of porFila) {
+    const b = el('button', bate(F.fila, f) ? 'ativa' : ''); b.title = `Filtrar pela fila ${f}`;
+    const tr = el('span', 'trilho'); const sp = el('span'); sp.style.width = (maxF ? (v / maxF) * 100 : 0) + '%'; tr.appendChild(sp);
+    b.append(el('span', null, f), tr, el('span', 'val', moeda(v)));
+    b.addEventListener('click', () => alternar('fila', f)); bf.appendChild(b);
+  }
+  if (!porFila.length) bf.appendChild(el('p', 'dica', 'Nenhum custo rateado com os filtros atuais.'));
 
   // custos fixos (declaração executiva)
   const pf = $('painel-fixos'); pf.replaceChildren();
   for (const f of (cu.fixos || [])) {
-    const linha = el('div', 'atual'); linha.textContent = `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toFixed(2) + ' = ' : ''}${moeda(f.valor_brl)}/mês`;
+    const linha = el('div', 'atual'); linha.append(el('span', null, f.item), el('span', null, `${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toFixed(2) + ' = ' : ''}${moeda(f.valor_brl)}/mês`));
     pf.append(linha, el('p', 'motivo', f.motivo));
   }
+  const totF = el('div', 'atual total-fixos'); totF.append(el('span', null, 'Total'), el('span', null, `${moeda(cu.fixos_brl)}/mês`)); pf.appendChild(totF);
   pf.appendChild(el('p', 'motivo', `Total: ${moeda(cu.fixos_brl)}/mês. Actions: US$ ${Number(ac.preco_minuto_usd || 0).toFixed(3)}/min além de ${num(ac.franquia)} min. Só os minutos das rodadas do executor entram por tarefa; CI de PR e vigias ficam fora.`));
   const form = el('div', 'acao-caixa');
   const item = el('input'); item.type = 'text'; item.placeholder = 'Contrato (ex.: Vercel Pro)'; item.style.flex = '0 0 11rem';
@@ -935,8 +1154,9 @@ function desenharCustos() {
   const moedaSel = el('select'); for (const m of ['BRL', 'USD']) { const o = el('option', null, m); o.value = m; moedaSel.appendChild(o); } moedaSel.style.flex = '0 0 5rem';
   const motivo = el('input'); motivo.type = 'text'; motivo.placeholder = 'Motivo (mínimo 10 letras) — valor 0 tira do rateio';
   const b = el('button', 'btn sec', 'Declarar custo fixo'); const msg = el('p', 'aviso'); msg.hidden = true;
-  b.addEventListener('click', async () => { b.disabled = true; try { await rpc('company_os_declarar_custo_fixo', { p_item: item.value.trim(), p_valor: Number(valor.value), p_moeda: moedaSel.value, p_motivo: motivo.value.trim() }); await abrirCasa(); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
-  form.append(item, valor, moedaSel, motivo, b, msg); pf.appendChild(form);
+  b.addEventListener('click', async () => { b.disabled = true; try { await rpc('company_os_declarar_custo_fixo', { p_item: item.value.trim(), p_valor: Number(valor.value), p_moeda: moedaSel.value, p_motivo: motivo.value.trim() }); await abrirCasa(); toast('Custo fixo declarado.'); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
+  form.append(item, valor, moedaSel, motivo, b, msg);
+  const decl = el('details'); decl.appendChild(el('summary', null, 'Declarar ou mudar um custo fixo…')); decl.appendChild(form); pf.appendChild(decl);
 
   // rodadas recentes
   const lanc = (c.lancamentos || []).filter((l) => (!F.empresa || l.empresa === F.empresa) && (!F.produto || (l.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, l.fila)));
@@ -985,11 +1205,128 @@ function desenharReport() {
     const tdS = el('td'); tdS.appendChild(tag(rotuloEstado(i.estado) || i.estado, 'estado', i.estado));
     const tdQ = el('td'); tdQ.appendChild(tag(i.quem_abriu || '—', 'quem', i.quem_abriu));
     const tdN = el('td'); tdN.appendChild(tag(i.natureza, 'natureza', i.natureza));
-    const tdT = el('td'); const bt = el('button', 'btn-texto', i.titulo); bt.style.padding = '0'; bt.style.textAlign = 'left'; bt.addEventListener('click', () => { ABERTOS.add(i.id); ABA = 'cc'; SUB = 'status'; F.estado = i.estado; mostrarAba(); render(); }); tdT.appendChild(bt);
+    const tdT = el('td'); const bt = el('button', 'btn-texto', i.titulo); bt.addEventListener('click', () => abrirGaveta(i.id)); tdT.appendChild(bt);
     r.append(el('td', null, quando(i[base])), tdT, tdE, tdF, tdS, tdQ, tdN, el('td', 'n', `${num((i.caminho || {}).passos_percorridos)} / ${num((i.caminho || {}).desvios)}`), el('td', 'n', moeda(custoReal(i))));
     t.appendChild(r);
   }
   const tot = el('tr', 'total'); const tdt = el('td', null, `Total: ${num(lista.length)} item(ns)`); tdt.colSpan = 8; tot.append(tdt, el('td', 'n', moeda(lista.reduce((s, i) => s + custoReal(i), 0)))); t.appendChild(tot);
+}
+
+/* ── peças pequenas ───────────────────────────────────────────────────────── */
+function vazioGrande(titulo, texto) {
+  const d = el('div', 'vazio-grande'); d.append(icone('certo'), el('b', null, titulo), el('span', null, texto)); return d;
+}
+const esperaTexto = (d) => { const n = Number(d) || 0; return n === 0 ? 'desde hoje' : n === 1 ? 'há 1 dia' : `há ${n} dias`; };
+function lin(titulo, subPartes, dirTopo, dirBaixo, onClick, dirClasse) {
+  const b = el(onClick ? 'button' : 'div', 'lin'); if (onClick) b.addEventListener('click', onClick);
+  b.appendChild(el('span', 'lin-tit', titulo));
+  const sub = el('span', 'lin-sub'); for (const p of subPartes.filter(Boolean)) sub.appendChild(typeof p === 'string' ? el('span', null, p) : p); b.appendChild(sub);
+  const dir = el('span', 'lin-dir'); if (dirTopo) dir.appendChild(el('b', dirClasse || null, dirTopo)); if (dirBaixo) dir.appendChild(el('span', null, dirBaixo)); b.appendChild(dir);
+  return b;
+}
+function linVazia(alvo, texto) { const d = el('div', 'lin-vazia'); d.append(icone('certo'), el('span', null, texto)); alvo.appendChild(d); }
+
+/* ── VISÃO GERAL ──────────────────────────────────────────────────────────
+   A primeira tela responde, nesta ordem: o que espera por mim, o que está
+   andando sozinho, e quanto isso custa. Nenhum número nasce aqui — cada um é o
+   mesmo que a página de origem mostra, e o clique leva até ela. */
+function desenharInicio() {
+  const h = new Date().getHours();
+  const nome = ($('quem-nome').textContent || '').split(' ')[0];
+  const inbox = RETRATO.inbox || { total: 0, itens: [] };
+  const novos = (AVISOS.itens || []).filter((a) => !a.visto_em);
+  const p = RETRATO.plantao || {};
+  const exec = p.em_execucao || []; const fila = p.na_fila || [];
+  const vig = RETRATO.vigilancia || { total: 0, vermelhos: [] };
+  const cons = (RETRATO.painel && RETRATO.painel.consumo) || {};
+  const cu = ((RETRATO.custos || {}).custeio) || {};
+
+  const sa = $('saudacao'); sa.replaceChildren();
+  const esq = el('div');
+  esq.appendChild(el('h2', null, `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}${nome ? ', ' + nome : ''}`));
+  const res = el('p', 'resumo');
+  const partes = [];
+  partes.push(inbox.total ? [`${inbox.total} decisão(ões)`, ' esperam por você'] : ['Nada', ' espera por você']);
+  partes.push(novos.length ? [`${novos.length} aviso(s)`, ' sem ciência'] : ['nenhum aviso', ' novo']);
+  partes.push(exec.length ? [`${exec.length} em execução`, ' agora'] : ['executor', ' ocioso']);
+  partes.forEach(([b, t], n) => { if (n) res.appendChild(document.createTextNode(' · ')); res.append(el('b', null, b), document.createTextNode(t)); });
+  esq.appendChild(res);
+  sa.append(esq, el('p', 'dica', new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })));
+
+  const k = $('kpis-inicio'); k.replaceChildren();
+  const maisAntiga = Math.max(0, ...(inbox.itens || []).map((x) => Number(x.dias_esperando) || 0));
+  kpi(k, 'Aprovações', num(inbox.total), inbox.total ? `a mais antiga ${esperaTexto(maisAntiga)}` : 'nada espera por você', inbox.total ? (maisAntiga >= 2 ? 'atencao' : 'alerta') : 'ok', () => irPara('aprov'), false, 'aprovar');
+  kpi(k, 'Avisos sem ciência', num(novos.length), novos.length ? 'nada aqui pede decisão' : 'fila limpa', novos.length ? 'alerta' : 'ok', () => irPara('avisos'), false, 'sino');
+  kpi(k, 'Em execução', num(exec.length), exec.length ? `${num(fila.length)} esperando a vez` : fila.length ? `ocioso · ${num(fila.length)} na fila` : 'executor ocioso', exec.length ? 'ok' : '', () => { F.estado = 'in_progress'; irPara('status'); render(); }, false, 'raio');
+  kpi(k, 'Réguas verdes', `${num(vig.total - vig.vermelhos.length)}/${num(vig.total)}`, vig.vermelhos.length ? 'vermelha: ' + vig.vermelhos.join(', ') : 'todas verdes', vig.vermelhos.length ? 'atencao' : 'ok', () => irPara('monitor'), false, 'escudo');
+  const fx = cons.faixa === 'estourado' ? 'atencao' : (cons.faixa === 'aviso_2' || cons.faixa === 'aviso_3') ? 'alerta' : cons.percentual == null ? '' : 'ok';
+  const unidade = cons.unidade === 'USD' ? (n) => 'US$ ' + Number(n).toFixed(2).replace('.', ',') : (n) => num(n) + ' min';
+  const kc = kpi(k, 'Consumo de Actions', cons.percentual == null ? '—' : `${String(cons.percentual).replace('.', ',')}%`, cons.usado == null ? 'sem medição' : `${unidade(cons.usado)} de ${unidade(cons.teto)}`, fx, () => irPara('custos'), false, 'medidor');
+  if (cons.percentual != null) { const t = el('div', 'mini-trilho'); const sp = el('span'); sp.style.width = Math.min(100, Number(cons.percentual)) + '%'; t.appendChild(sp); kc.appendChild(t); }
+  kpi(k, 'Custo real do mês', moeda(cu.custo_real_total), cu.provisorio ? 'fixos + excedente · provisório' : 'mês fechado', '', () => irPara('custos'), false, 'dinheiro');
+
+  // Precisa de você
+  const porId = new Map(todosItens().map((i) => [i.id, i]));
+  const ia = $('inicio-aprov'); ia.replaceChildren();
+  const pend = ((inbox.itens) || []).filter((x) => { const i = porId.get(x.id); return !i || passa(i); }).slice(0, 6);
+  if (!pend.length) linVazia(ia, inbox.total ? 'Nada com os filtros atuais.' : 'Nada espera por você. A fila anda sozinha.');
+  for (const x of pend) {
+    const i = porId.get(x.id);
+    const escalado = x.classe === 'travado' && x.contexto && x.contexto.escalado_pelo_cto;
+    ia.appendChild(lin(x.titulo,
+      [el('span', 'sit ' + (Number(x.dias_esperando) >= 2 ? 'parado' : 'espera'), escalado ? 'escalado pelo CTO' : (ROTULO_CLASSE[x.classe] || x.classe)), i && i.produto, i && i.fila],
+      esperaTexto(x.dias_esperando), Number(x.custo_ja_gasto) > 0 ? moeda(x.custo_ja_gasto) : null,
+      () => { irPara('aprov'); setTimeout(() => { const c = $('aprov-' + x.id); if (c) { c.scrollIntoView({ block: 'center', behavior: 'smooth' }); const inp = c.querySelector('input'); if (inp) inp.focus({ preventScroll: true }); } }, 60); },
+      Number(x.dias_esperando) >= 2 ? 'quente' : null));
+  }
+
+  // Executor agora
+  const ie = $('inicio-executor'); ie.replaceChildren();
+  const st = el('div', 'exec-status');
+  const lg = el('span', 'luz-grande' + (exec.length ? ' on' : fila.length ? ' espera' : '')); lg.appendChild(icone(exec.length ? 'raio' : 'relogio'));
+  const tx = el('div'); tx.append(el('b', null, exec.length ? `${exec.length} em execução agora` : fila.length ? `${fila.length} esperando a vez` : 'Executor ocioso'),
+    el('small', null, `último despacho ${p.ultimo_despacho ? quando(p.ultimo_despacho) : '—'} · redespacho automático ${p.redespacho_agendado ? 'ligado' : 'DESLIGADO'}`));
+  st.append(lg, tx); ie.appendChild(st);
+  const le = el('div', 'linhas-lista'); ie.appendChild(le);
+  for (const x of exec) le.appendChild(lin(x.titulo, [el('span', 'sit anda', 'em execução'), x.squad, x.executor], `desde ${hhmm(x.desde)}`, null, porId.has(x.id) ? () => abrirGaveta(x.id) : null));
+  for (const x of fila.slice(0, Math.max(0, 4 - exec.length))) le.appendChild(lin(x.titulo, [el('span', 'sit', 'próximo na fila'), x.squad, x.tentativas ? `já falhou ${x.tentativas}×` : null], null, null, porId.has(x.id) ? () => abrirGaveta(x.id) : null));
+  if (!exec.length && !fila.length) linVazia(le, 'Nada na fila de execução.');
+
+  // Distribuição por situação — os mesmos números dos filtros de Itens
+  const idist = $('inicio-dist'); idist.replaceChildren();
+  const abertosF = itens().filter(aberto);
+  const est = ESTADOS.filter(([e]) => e !== 'done' && e !== 'cancelled').map(([e, rot]) => [e, rot, abertosF.filter((i) => i.estado === e).length]).filter(([, , n]) => n > 0);
+  const tot = abertosF.length;
+  const cabD = el('div', 'exec-status'); const tg = el('span', 'luz-grande'); tg.appendChild(icone('lista'));
+  const txd = el('div'); txd.append(el('b', null, `${num(tot)} itens em aberto`), el('small', null, Object.keys(F).length ? 'com os filtros atuais' : 'em todas as empresas e produtos'));
+  cabD.append(tg, txd); idist.appendChild(cabD);
+  const pil = el('div', 'pilha');
+  for (const [e, rot, n] of est) { const sp = el('span', 'c-' + e); sp.style.flexGrow = String(n); sp.title = `${rot}: ${n}`; pil.appendChild(sp); }
+  if (tot) idist.appendChild(pil);
+  const leg = el('div', 'leg');
+  for (const [e, rot, n] of est) { const b = el('button'); b.title = `Ver só "${rot}"`; b.append(el('i', 'c-' + e), el('span', null, rot), el('b', null, num(n))); b.addEventListener('click', () => { F.estado = e; irPara('status'); render(); }); leg.appendChild(b); }
+  if (!tot) linVazia(idist, 'Nada em aberto com os filtros atuais.');
+  idist.appendChild(leg);
+
+  // Avisos sem ciência
+  const iav = $('inicio-avisos'); iav.replaceChildren();
+  if (!novos.length) linVazia(iav, 'Nenhum aviso novo.');
+  for (const a of novos.slice(0, 5)) {
+    const d = Number(a.dias_sem_ciencia) || 0;
+    iav.appendChild(lin(a.assunto, [el('span', 'sit ' + (d >= 7 ? 'parado' : 'espera'), d >= 1 ? `sem ciência há ${d} dia(s)` : 'novo'), a.origem], dia(a.criado_em), null, () => irPara('avisos')));
+  }
+
+  // Entregue pela régua
+  const ir = $('inicio-regua'); ir.replaceChildren();
+  const regua = ((RETRATO.estrutura && RETRATO.estrutura.entregas_da_regua) || []).filter((e) => (!F.empresa || e.empresa === F.empresa) && (!F.produto || (e.produto || '— sem produto —') === F.produto));
+  $('inicio-regua-n').textContent = regua.length ? `${regua.length} entrega(s) — só para você saber` : '';
+  if (!regua.length) linVazia(ir, 'Nenhuma entrega da régua nos últimos 7 dias com os filtros atuais.');
+  for (const e of regua.slice(0, 8)) {
+    const url = /^https?:\/\//.test(e.referencia || '') ? e.referencia : null;
+    const l = lin(e.titulo, [el('span', 'sit ok', e.concluida ? 'em produção' : 'aceita pelo CI'), e.produto, e.fila], quando(e.aceita_em), url ? 'ver o PR ↗' : null,
+      url ? () => window.open(url, '_blank', 'noopener,noreferrer') : null);
+    ir.appendChild(l);
+  }
 }
 
 /* ── render geral ─────────────────────────────────────────────────────────── */
@@ -998,7 +1335,9 @@ function render() {
   desenharChips(); montarSeletores();
   desenharAprov(); desenharStatus(); desenharOrg(); desenharPaths();
   desenharPedido(); desenharAvisos(); desenharMonitor(); desenharCustos(); desenharReport();
+  desenharInicio(); desenharGaveta();
   mostrarAba();
 }
 
+aplicarTema(temaEscolhido());
 boot();

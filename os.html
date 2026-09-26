@@ -2,210 +2,307 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="color-scheme" content="light dark">
 <title>Command Center — FineApps</title>
+<!-- O tema é decidido ANTES da primeira pintura (sem piscar branco no escuro).
+     Arquivo próprio porque o CSP desta rota é script-src 'self' — nada inline. -->
+<script src="os-tema.js"></script>
 <link rel="stylesheet" href="os.css">
 </head>
 <body class="os">
 
-<!-- ENTRADA -->
+<!-- ═════════════════════════ ENTRADA ═════════════════════════ -->
 <section id="entrada" class="entrada">
+  <div class="entrada-fundo" aria-hidden="true"></div>
   <div class="entrada-cartao">
-    <div class="entrada-marca">FineApps <span>Command Center</span></div>
-    <p class="entrada-sub">Área interna. Entre com a sua conta.</p>
+    <div class="marca marca-grande"><span class="marca-selo">F</span><span class="marca-texto">FineApps<small>Command Center</small></span></div>
+    <h1 class="entrada-titulo">Entrar</h1>
+    <p class="entrada-sub">Área interna. Use a sua conta da FineApps.</p>
     <form id="form-login" autocomplete="on">
       <label for="email">E-mail</label>
       <input id="email" name="email" type="email" autocomplete="username" required>
       <label for="senha">Senha</label>
       <input id="senha" name="senha" type="password" autocomplete="current-password" required>
-      <button type="submit" id="btn-entrar" class="btn">Entrar</button>
+      <button type="submit" id="btn-entrar" class="btn btn-bloco">Entrar</button>
       <p class="aviso" id="erro-login" role="alert" hidden></p>
     </form>
+    <button type="button" class="tema-entrada" data-tema-ciclo title="Trocar tema"><span data-icone="tema"></span><span data-tema-rotulo>Tema do sistema</span></button>
   </div>
 </section>
 
-<!-- APLICAÇÃO -->
+<!-- ═════════════════════════ APLICAÇÃO ═════════════════════════ -->
 <div id="app" class="app" hidden>
 
-  <header class="topo">
-    <div class="topo-marca">FineApps <span>Command Center</span></div>
-    <nav class="abas" id="abas" aria-label="Abas">
-      <button data-aba="cc" aria-selected="true">Command Center</button>
-      <button data-aba="pedido">Novo pedido</button>
-      <button data-aba="avisos">Avisos <span class="pill" id="pill-avisos" hidden></span></button>
-      <button data-aba="monitor">Monitor <span class="pill" id="pill-monitor" hidden></span></button>
-      <button data-aba="custos">Custos <span class="pill" id="pill-custos" hidden></span></button>
-      <button data-aba="report">Report</button>
+  <aside class="lateral" id="lateral" aria-label="Navegação">
+    <div class="lateral-topo">
+      <div class="marca"><span class="marca-selo">F</span><span class="marca-texto">FineApps<small>Command Center</small></span></div>
+      <button type="button" class="ico-btn so-movel" id="fechar-menu" aria-label="Fechar menu"><span data-icone="x"></span></button>
+    </div>
+
+    <button type="button" class="btn btn-bloco novo-pedido" data-aba="pedido"><span data-icone="mais"></span>Novo pedido<kbd>N</kbd></button>
+
+    <nav class="nav" id="abas">
+      <button data-aba="inicio" aria-selected="true"><span data-icone="inicio"></span><span class="nav-rot">Visão geral</span><kbd>1</kbd></button>
+
+      <p class="nav-grupo">Decidir</p>
+      <button data-aba="aprov"><span data-icone="aprovar"></span><span class="nav-rot">Aprovações</span><span class="pill" id="pill-aprov" hidden></span><kbd>2</kbd></button>
+      <button data-aba="avisos"><span data-icone="sino"></span><span class="nav-rot">Avisos</span><span class="pill" id="pill-avisos" hidden></span><kbd>3</kbd></button>
+
+      <p class="nav-grupo">Acompanhar</p>
+      <button data-aba="status"><span data-icone="lista"></span><span class="nav-rot">Itens</span><kbd>4</kbd></button>
+      <button data-aba="filas"><span data-icone="org"></span><span class="nav-rot">Organograma</span><kbd>5</kbd></button>
+      <button data-aba="paths"><span data-icone="rota"></span><span class="nav-rot">Caminhos</span><kbd>6</kbd></button>
+
+      <p class="nav-grupo">Saúde e dinheiro</p>
+      <button data-aba="monitor"><span data-icone="pulso"></span><span class="nav-rot">Monitor</span><span class="pill" id="pill-monitor" hidden></span><kbd>7</kbd></button>
+      <button data-aba="custos"><span data-icone="dinheiro"></span><span class="nav-rot">Custos</span><span class="pill" id="pill-custos" hidden></span><kbd>8</kbd></button>
+      <button data-aba="report"><span data-icone="grafico"></span><span class="nav-rot">Report</span><kbd>9</kbd></button>
     </nav>
-    <div class="topo-direita">
-      <span class="quem" id="quem"></span>
-      <button id="atualizar" class="btn-texto" title="Atualizar agora">Atualizar</button>
-      <button id="sair" class="btn-texto">Sair</button>
+
+    <div class="lateral-pe">
+      <div class="tema-seg" role="radiogroup" aria-label="Tema">
+        <button type="button" role="radio" data-tema="claro" title="Claro"><span data-icone="sol"></span></button>
+        <button type="button" role="radio" data-tema="sistema" title="Seguir o sistema"><span data-icone="tela"></span></button>
+        <button type="button" role="radio" data-tema="escuro" title="Escuro"><span data-icone="lua"></span></button>
+      </div>
+      <div class="usuario">
+        <span class="avatar" id="avatar">R</span>
+        <span class="usuario-txt"><b id="quem-nome">—</b><small id="quem"></small></span>
+        <button id="sair" class="ico-btn" title="Sair" aria-label="Sair"><span data-icone="sair"></span></button>
+      </div>
     </div>
-  </header>
+  </aside>
+  <div class="veu" id="veu" hidden></div>
 
-  <div class="filtros" id="filtros">
-    <div class="filtro-grupo">
-      <label for="f-empresa">Empresa</label>
-      <select id="f-empresa"><option value="">Todas</option></select>
+  <div class="principal">
+    <header class="topo">
+      <button type="button" class="ico-btn so-movel" id="abrir-menu" aria-label="Abrir menu"><span data-icone="menu"></span></button>
+      <div class="topo-titulo">
+        <h1 id="titulo-pagina">Visão geral</h1>
+        <p id="sub-pagina"></p>
+      </div>
+      <div class="topo-direita">
+        <span class="ao-vivo" id="carimbo" title="O retrato é refeito a cada minuto"><i></i><span id="carimbo-txt">—</span></span>
+        <button id="atualizar" class="ico-btn" title="Atualizar agora (R)" aria-label="Atualizar agora"><span data-icone="atualizar"></span></button>
+        <button type="button" class="ico-btn" data-tema-ciclo title="Trocar tema (T)" aria-label="Trocar tema"><span data-icone="tema"></span></button>
+      </div>
+    </header>
+
+    <div class="filtros" id="filtros">
+      <span class="filtros-ico" data-icone="filtro" aria-hidden="true"></span>
+      <div class="filtro-grupo">
+        <label for="f-empresa">Empresa</label>
+        <select id="f-empresa"><option value="">Todas</option></select>
+      </div>
+      <div class="filtro-grupo">
+        <label for="f-produto">Produto</label>
+        <select id="f-produto"><option value="">Todos</option></select>
+      </div>
+      <div class="chips" id="chips"></div>
+      <button id="limpar" class="btn-texto" hidden>Limpar filtros</button>
     </div>
-    <div class="filtro-grupo">
-      <label for="f-produto">Produto</label>
-      <select id="f-produto"><option value="">Todos</option></select>
-    </div>
-    <div class="chips" id="chips"></div>
-    <button id="limpar" class="btn-texto" hidden>Limpar filtros</button>
-    <span class="carimbo" id="carimbo"></span>
-  </div>
 
-  <main class="conteudo">
+    <main class="conteudo" id="conteudo">
 
-    <!-- ABA 1: COMMAND CENTER -->
-    <section class="aba" data-aba="cc">
-      <nav class="subabas" id="subabas" aria-label="Seções do Command Center">
-        <button data-sub="aprov" aria-selected="true">Aprovações pendentes <span class="pill" id="pill-aprov">0</span></button>
-        <button data-sub="status">Status</button>
-        <button data-sub="filas">Filas</button>
-        <button data-sub="paths">Paths</button>
-      </nav>
+      <!-- VISÃO GERAL -->
+      <section class="aba" data-aba="inicio">
+        <div class="saudacao" id="saudacao"></div>
+        <div class="kpis kpis-6" id="kpis-inicio"></div>
+        <div class="grade-inicio">
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Precisa de você</h2><button class="btn-texto" data-ir="aprov">Ver todas</button></div>
+            <div class="linhas-lista" id="inicio-aprov"></div>
+          </div>
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Executor agora</h2><button class="btn-texto" data-ir="status">Ver itens</button></div>
+            <div id="inicio-executor"></div>
+          </div>
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Itens em aberto por situação</h2><button class="btn-texto" data-ir="status">Abrir</button></div>
+            <div id="inicio-dist"></div>
+          </div>
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Avisos sem ciência</h2><button class="btn-texto" data-ir="avisos">Ver avisos</button></div>
+            <div class="linhas-lista" id="inicio-avisos"></div>
+          </div>
+          <div class="cartao cartao-largo">
+            <div class="cartao-cab"><h2>Entregue pela régua — últimos 7 dias</h2><span class="dica" id="inicio-regua-n"></span></div>
+            <div class="linhas-lista" id="inicio-regua"></div>
+          </div>
+        </div>
+      </section>
 
-      <div class="sub" data-sub="aprov">
+      <!-- APROVAÇÕES -->
+      <section class="aba" data-aba="aprov" hidden>
         <p class="sub-texto" id="sub-aprov"></p>
         <div class="lista acao" id="lista-aprov"></div>
-      </div>
+      </section>
 
-      <div class="sub" data-sub="status" hidden>
+      <!-- AVISOS (D-14) — o que você precisa saber e não exige decisão sua -->
+      <section class="aba" data-aba="avisos" hidden>
+        <div class="barra-acoes">
+          <p class="sub-texto" id="sub-avisos"></p>
+          <div id="barra-ciencia" hidden>
+            <button id="btn-ciencia" class="btn sec">Dar ciência em todos os não vistos</button>
+            <span class="dica" id="dica-ciencia"></span>
+          </div>
+        </div>
+        <p class="aviso" id="msg-avisos" role="status" hidden></p>
+        <div class="lista acao" id="lista-avisos"></div>
+      </section>
+
+      <!-- ITENS (Status) -->
+      <section class="aba" data-aba="status" hidden>
         <div class="faixa-executor" id="faixa-executor"></div>
         <div class="badges" id="badges-status"></div>
         <div class="lista grade" id="lista-status"></div>
-      </div>
+      </section>
 
-      <div class="sub" data-sub="filas" hidden>
-        <p class="sub-texto">Organograma ao vivo. O número é o que está em aberto; o vermelho é o que está parado. Clique numa caixa para ver o que há nela.</p>
+      <!-- ORGANOGRAMA (Filas) -->
+      <section class="aba" data-aba="filas" hidden>
+        <p class="sub-texto">Organograma ao vivo. O número é o que está em aberto; o vermelho é o que está parado. Clique numa caixa para filtrar.</p>
         <div class="org" id="org"></div>
-        <div class="lista" id="lista-filas"></div>
-      </div>
+        <div class="lista grade" id="lista-filas"></div>
+      </section>
 
-      <div class="sub" data-sub="paths" hidden>
-        <p class="sub-texto">Caminho esperado: <span class="cam-esperado" id="cam-esperado"></span>. Cada tarefa mostra o que percorreu; desvios em âmbar, perna não classificada em vermelho.</p>
+      <!-- CAMINHOS (Paths) -->
+      <section class="aba" data-aba="paths" hidden>
+        <p class="sub-texto">Caminho esperado: <span class="cam-esperado" id="cam-esperado"></span>. Desvios em âmbar, perna não classificada em vermelho.</p>
         <div class="badges" id="badges-paths"></div>
         <h3>Em aberto</h3>
         <div class="lista grade" id="paths-abertos"></div>
         <h3>Fechados</h3>
         <div class="lista grade" id="paths-fechados"></div>
-      </div>
-    </section>
+      </section>
 
-    <!-- ABA 2: NOVO PEDIDO -->
-    <section class="aba" data-aba="pedido" hidden>
-      <div class="painel-form">
-        <h2>Novo pedido</h2>
-        <p class="sub-texto">Entra assinado por você, é triado e roteado sozinho. Você recebe o retorno por e-mail quando concluir.</p>
-        <form id="form-pedido">
-          <div class="grade-2">
-            <div>
-              <label for="p-empresa">Empresa</label>
-              <select id="p-empresa" required></select>
+      <!-- NOVO PEDIDO -->
+      <section class="aba" data-aba="pedido" hidden>
+        <div class="grade-pedido">
+          <div class="cartao painel-form">
+            <p class="sub-texto">Entra assinado por você, é triado e roteado sozinho. Você recebe o retorno por e-mail quando concluir.</p>
+            <form id="form-pedido">
+              <div class="grade-2">
+                <div>
+                  <label for="p-empresa">Empresa</label>
+                  <select id="p-empresa" required></select>
+                </div>
+                <div>
+                  <label for="p-produto">Produto</label>
+                  <select id="p-produto"><option value="">— nenhum (é da empresa) —</option></select>
+                </div>
+              </div>
+              <label for="p-titulo">Título</label>
+              <input id="p-titulo" type="text" minlength="10" required placeholder="O que precisa acontecer">
+              <label for="p-desc">Descrição</label>
+              <textarea id="p-desc" rows="8" minlength="30" required placeholder="Quem vai executar não estava na conversa em que isto fez sentido. Escreva o suficiente para agir sem perguntar. Termine com: Pronto quando: …"></textarea>
+              <div class="grade-2">
+                <div>
+                  <label for="p-prio">Prioridade</label>
+                  <select id="p-prio">
+                    <option value="critica">Crítica</option>
+                    <option value="alta">Alta</option>
+                    <option value="media" selected>Média</option>
+                    <option value="baixa">Baixa</option>
+                  </select>
+                </div>
+                <div class="alinha-fim"><button type="submit" id="btn-pedido" class="btn btn-bloco">Abrir pedido</button></div>
+              </div>
+              <p class="aviso" id="msg-pedido" role="status" hidden></p>
+            </form>
+          </div>
+          <div>
+            <h3>Seus pedidos recentes</h3>
+            <div class="lista" id="meus-pedidos"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MONITOR -->
+      <section class="aba" data-aba="monitor" hidden>
+        <div class="kpis" id="kpis-monitor"></div>
+        <div class="grade-2 topo-espaco">
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Réguas</h2><span class="dica" id="sub-reguas"></span></div>
+            <div class="saude" id="saude-reguas"></div>
+            <div class="reguas" id="reguas"></div>
+          </div>
+          <div>
+            <div class="cartao">
+              <div class="cartao-cab"><h2>Rampas de autonomia</h2></div>
+              <div class="rampas" id="painel-rampas"></div>
             </div>
-            <div>
-              <label for="p-produto">Produto</label>
-              <select id="p-produto"><option value="">— nenhum (é da empresa) —</option></select>
+            <div class="cartao topo-espaco">
+              <div class="cartao-cab"><h2>Executor — últimos despachos</h2></div>
+              <div class="linhas" id="mon-executor"></div>
+            </div>
+            <div class="cartao topo-espaco">
+              <div class="cartao-cab"><h2>Desvios nos últimos 7 dias</h2></div>
+              <div class="linhas" id="mon-desvios"></div>
             </div>
           </div>
-          <label for="p-titulo">Título</label>
-          <input id="p-titulo" type="text" minlength="10" required placeholder="O que precisa acontecer">
-          <label for="p-desc">Descrição</label>
-          <textarea id="p-desc" rows="6" minlength="30" required placeholder="Quem vai executar não estava na conversa em que isto fez sentido. Escreva o suficiente para agir sem perguntar. Termine com o critério de aceite."></textarea>
-          <div class="grade-2">
-            <div>
-              <label for="p-prio">Prioridade</label>
-              <select id="p-prio">
-                <option value="critica">Crítica</option>
-                <option value="alta">Alta</option>
-                <option value="media" selected>Média</option>
-                <option value="baixa">Baixa</option>
-              </select>
-            </div>
-            <div class="alinha-fim"><button type="submit" id="btn-pedido" class="btn">Abrir pedido</button></div>
+        </div>
+      </section>
+
+      <!-- CUSTOS -->
+      <section class="aba" data-aba="custos" hidden>
+        <!-- M418 — o medidor de consumo, antes dos números do mês: ele responde
+             "quanto falta para o limite", que é a pergunta que vem primeiro. -->
+        <div id="medidor-consumo" class="faixa-topo"></div>
+        <div class="kpis" id="kpis-custos"></div>
+        <div class="grade-custos topo-espaco">
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Custo real por fila</h2><span class="dica">clique numa barra para filtrar</span></div>
+            <div class="barras" id="barras-filas"></div>
+            <div class="tabela-envolve"><table class="tabela" id="custos-filas"></table></div>
           </div>
-          <p class="aviso" id="msg-pedido" role="status" hidden></p>
-        </form>
-      </div>
-      <h3>Seus pedidos recentes</h3>
-      <div class="lista" id="meus-pedidos"></div>
-    </section>
-
-    <!-- ABA 3: AVISOS (D-14) — o que você precisa saber e não exige decisão sua -->
-    <section class="aba" data-aba="avisos" hidden>
-      <p class="sub-texto" id="sub-avisos"></p>
-      <div class="acao-caixa" id="barra-ciencia" hidden>
-        <button id="btn-ciencia" class="btn sec">Dar ciência em todos os não vistos</button>
-        <span class="dica" id="dica-ciencia"></span>
-      </div>
-      <p class="aviso" id="msg-avisos" role="status" hidden></p>
-      <div class="lista acao" id="lista-avisos"></div>
-    </section>
-
-    <!-- ABA 4: MONITOR -->
-    <section class="aba" data-aba="monitor" hidden>
-      <div class="kpis" id="kpis-monitor"></div>
-      <div class="grade-2 topo-espaco">
-        <div>
-          <h3>Réguas <span class="sub-inline" id="sub-reguas"></span></h3>
-          <div class="reguas" id="reguas"></div>
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Custos fixos do mês</h2></div>
+            <div class="painel-teto" id="painel-fixos"></div>
+          </div>
+          <div class="cartao cartao-largo">
+            <div class="cartao-cab"><h2>Custo real por tarefa no mês</h2><span class="dica" id="sub-custeio"></span></div>
+            <p class="dica">O que você paga por mês, rateado pelo consumo de cada tarefa, mais os minutos de GitHub Actions além da franquia. Provisório até o mês fechar.</p>
+            <div class="tabela-envolve"><table class="tabela" id="custeio-itens"></table></div>
+          </div>
+          <div class="cartao cartao-largo">
+            <div class="cartao-cab"><h2>Rodadas recentes</h2><span class="dica" id="sub-lanc"></span></div>
+            <div class="tabela-envolve"><table class="tabela" id="lancamentos"></table></div>
+          </div>
         </div>
-        <div>
-          <h3>Rampas de autonomia</h3>
-          <div class="painel-teto" id="painel-rampas"></div>
-          <h3>Executor</h3>
-          <div class="linhas" id="mon-executor"></div>
-          <h3>Desvios nos últimos 7 dias</h3>
-          <div class="linhas" id="mon-desvios"></div>
+      </section>
+
+      <!-- REPORT -->
+      <section class="aba" data-aba="report" hidden>
+        <div class="report-filtros cartao">
+          <div><label for="r-de">De</label><input type="date" id="r-de"></div>
+          <div><label for="r-ate">Até</label><input type="date" id="r-ate"></div>
+          <div><label for="r-fila">Fila</label><select id="r-fila"><option value="">Todas</option></select></div>
+          <div><label for="r-quem">Quem abriu</label><select id="r-quem"><option value="">Todos</option></select></div>
+          <div><label for="r-nat">Natureza</label><select id="r-nat"><option value="">Todas</option><option value="técnico">Técnico</option><option value="negócio">Negócio</option></select></div>
+          <div><label for="r-base">Data-base</label><select id="r-base"><option value="criado">Abertura</option><option value="atualizado">Última mudança</option><option value="concluido">Conclusão</option></select></div>
         </div>
-      </div>
-    </section>
+        <div class="kpis" id="kpis-report"></div>
+        <div class="cartao topo-espaco sem-respiro"><div class="tabela-envolve"><table class="tabela" id="tabela-report"></table></div></div>
+      </section>
 
-    <!-- ABA 4: CUSTOS -->
-    <section class="aba" data-aba="custos" hidden>
-      <!-- M418 — o medidor de consumo, antes dos números do mês: ele responde
-           "quanto falta para o limite", que é a pergunta que vem primeiro. -->
-      <div id="medidor-consumo" class="faixa-topo"></div>
-      <div class="kpis" id="kpis-custos"></div>
-      <div class="grade-2 topo-espaco">
-        <div>
-          <h3>Custo real por tarefa no mês <span class="sub-inline" id="sub-custeio"></span></h3>
-          <p class="sub-texto">O que você paga por mês, rateado pelo consumo de cada tarefa, mais os minutos de GitHub Actions além da franquia. Provisório até o mês fechar.</p>
-          <table class="tabela" id="custeio-itens"></table>
-          <h3>Por fila</h3>
-          <table class="tabela" id="custos-filas"></table>
-        </div>
-        <div>
-          <h3>Custos fixos do mês</h3>
-          <div class="painel-teto" id="painel-fixos"></div>
-          <h3>Rodadas recentes <span class="sub-inline" id="sub-lanc"></span></h3>
-          <table class="tabela" id="lancamentos"></table>
-        </div>
-      </div>
-    </section>
+    </main>
 
-    <!-- ABA 5: REPORT -->
-    <section class="aba" data-aba="report" hidden>
-      <div class="report-filtros">
-        <div><label for="r-de">De</label><input type="date" id="r-de"></div>
-        <div><label for="r-ate">Até</label><input type="date" id="r-ate"></div>
-        <div><label for="r-fila">Fila</label><select id="r-fila"><option value="">Todas</option></select></div>
-        <div><label for="r-quem">Quem abriu</label><select id="r-quem"><option value="">Todos</option></select></div>
-        <div><label for="r-nat">Natureza</label><select id="r-nat"><option value="">Todas</option><option value="técnico">Técnico</option><option value="negócio">Negócio</option></select></div>
-        <div><label for="r-base">Data-base</label><select id="r-base"><option value="criado">Abertura</option><option value="atualizado">Última mudança</option><option value="concluido">Conclusão</option></select></div>
-      </div>
-      <div class="kpis" id="kpis-report"></div>
-      <table class="tabela" id="tabela-report"></table>
-    </section>
+    <footer class="rodape">FineApps Sistemas Ltda. — área interna, não indexada. Os números vêm do banco; a tela não calcula nada sozinha. <span class="atalhos-dica">Atalhos: 1–9 páginas · N novo pedido · R atualizar · T tema · Esc fecha</span></footer>
+  </div>
 
-  </main>
+  <!-- O detalhe do item abre de lado, sem tirar você da lista -->
+  <aside class="gaveta" id="gaveta" aria-hidden="true" aria-labelledby="gaveta-titulo" role="dialog">
+    <div class="gaveta-cab">
+      <span class="gaveta-rotulo">Item</span>
+      <button type="button" class="ico-btn" id="fechar-gaveta" aria-label="Fechar (Esc)"><span data-icone="x"></span></button>
+    </div>
+    <div class="gaveta-corpo" id="gaveta-corpo"></div>
+  </aside>
+  <div class="veu veu-gaveta" id="veu-gaveta" hidden></div>
 
-  <footer class="rodape">FineApps Sistemas Ltda. — área interna, não indexada. Os números vêm do banco; a tela não calcula nada sozinha.</footer>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
 </div>
 
 <script src="os.js"></script>
