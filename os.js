@@ -398,14 +398,16 @@ document.addEventListener('keydown', (e) => {
 /* ── vocabulário ──────────────────────────────────────────────────────────── */
 const ESTADOS = [
   ['ready', 'Abertos, na fila'], ['in_progress', 'Em andamento'], ['validation', 'Entregues — em aceite'],
-  ['decision_required', 'Parados — precisam de você'], ['blocked', 'Bloqueados'], ['failed', 'Falharam'],
+  ['decision_required', 'Parados — em decisão'], ['blocked', 'Bloqueados'], ['failed', 'Falharam'],
   ['done', 'Concluídos'], ['cancelled', 'Cancelados'],
 ];
 const rotuloEstado = (k) => (ESTADOS.find(([e]) => e === k) || [])[1];
 function tentativasTexto(i) {
   if (!i.tentativas) return '';
   const restam = (i.teto_tentativas || 0) - i.tentativas + 1;
-  return restam <= 1 ? `já falhou ${i.tentativas}× — se falhar de novo, vai para as suas Aprovações`
+  // (26/09) item técnico não sobe ao CEO: ao bater o teto, vai à mesa do CTO (ou a Triagem divide)
+  const destino = (i.alcada === 'technical' || i.natureza === 'técnico') ? 'sai da fila e o CTO decide (não vem para você)' : 'vai para as suas Aprovações';
+  return restam <= 1 ? `já falhou ${i.tentativas}× — se falhar de novo, ${destino}`
                      : `já falhou ${i.tentativas}× — restam ${restam} tentativas`;
 }
 function situacao(i) {
@@ -418,7 +420,9 @@ function situacao(i) {
     if (!i.entrega_aberta) return 'aceita — o executor está concluindo';
     return NA_CAIXA.get(i.id) === 'entrega_aguarda_aceite' ? 'entregue — aguarda o SEU aceite' : 'entregue — o aceite é da régua (CI/CTO), não seu';
   }
-  if (i.estado === 'decision_required') return 'parado — precisa de você';
+  // ⚠ (26/09) "parado" nem sempre é com você: item técnico parado é do CTO, e estouro
+  //    de turnos a Triagem divide. Só diz "precisa de você" o que está na SUA caixa.
+  if (i.estado === 'decision_required') return NA_CAIXA.has(i.id) ? 'parado — precisa de você' : 'parado — com o CTO ou a Triagem (não é com você)';
   if (i.estado === 'done') return `concluído em ${quando(i.concluido)}${i.tem_prova ? ' · com prova' : ' · SEM prova'}`;
   return rotuloEstado(i.estado) || i.estado;
 }
@@ -427,7 +431,7 @@ function situacao(i) {
    e 60 itens tinham exatamente o mesmo peso visual — varrer a lista não dizia
    nada. Agora a cor responde "isto anda sozinho ou depende de mim?". */
 function tomDoItem(i) {
-  if (i.estado === 'decision_required') return 'parado';
+  if (i.estado === 'decision_required') return NA_CAIXA.has(i.id) ? 'parado' : 'espera';
   if (NA_CAIXA.has(i.id)) return 'espera';
   if (i.estado === 'validation' && i.entrega_aberta) return 'anda';
   if (i.estado === 'in_progress') return 'anda';
