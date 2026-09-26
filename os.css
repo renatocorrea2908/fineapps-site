@@ -722,3 +722,34 @@ button.lin:hover { background: var(--sup-3); }
 .filtro-pe .btn { padding: .4rem .9rem; }
 
 .saudacao .data-hoje { text-transform: capitalize; margin: 0 0 .15rem; }
+
+/* (26/09) o card de custo fixo lista os contratos em fonte miúda */
+.kpi .s.lista-fixos { display: flex; flex-direction: column; gap: .05rem; white-space: normal; font-size: .72rem; line-height: 1.35; margin-top: .25rem; }
+.kpi .s.lista-fixos .cambio { color: var(--tinta-3); opacity: .8; }
+/* (M473) os robôs do GitHub, um bloco por robô, com o próprio interruptor */
+.robo { padding: .85rem 0; border-top: 1px solid var(--linha); }
+.robo:first-child { border-top: 0; padding-top: 0; }
+.robo p { margin: .35rem 0 0; font-size: .82rem; color: var(--tinta-2); }
+.robo .motivo-fonte { color: var(--tinta-3); font-size: .78rem; }
+.robo details > summary { margin-top: .5rem; }
+.robo.pausado .rampa-cab b { color: var(--tinta-3); }
+#medias-seletor .badge { cursor: pointer; }
+
+/* (M472/D6) a ficha de uma página no cartão de Aprovações e Aceitações */
+.em-preparo { display: flex; gap: .6rem; align-items: center; border: 1px dashed var(--linha); border-radius: 12px; padding: .6rem .9rem; color: var(--tinta-2); font-size: .85rem; margin-bottom: .8rem; }
+.em-preparo .ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--ambar, #b26a00); flex: none; }
+.ficha-decisao { margin-top: .6rem; }
+.ficha-rot { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-3); margin: .8rem 0 .35rem; font-weight: 600; }
+.ficha-pergunta { font-size: 1.05rem; font-weight: 650; line-height: 1.35; padding: .7rem .85rem; border-radius: 10px; background: var(--marca-suave); color: var(--tinta); }
+.ficha-negocio { margin: 0; font-size: .88rem; color: var(--tinta); }
+.ficha-recs { display: grid; gap: .45rem; }
+.ficha-rec { display: grid; grid-template-columns: 9rem 6rem 1fr; gap: .6rem; align-items: start; padding: .55rem .7rem; border: 1px solid var(--linha); border-radius: 10px; font-size: .85rem; }
+.ficha-rec .sit { text-align: center; }
+.ficha-quem b { display: block; } .ficha-quem small { color: var(--tinta-3); }
+.ficha-numeros { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.ficha-num { border: 1px solid var(--linha); border-radius: 10px; padding: .65rem .8rem; }
+.ficha-num .v { font-size: 1.25rem; font-weight: 700; } .ficha-num .n { font-size: .78rem; color: var(--tinta-3); }
+.ficha-num .base { display: inline-block; margin-top: .3rem; font-size: .72rem; color: var(--tinta-2); background: var(--fundo-2, rgba(0,0,0,.04)); border-radius: 6px; padding: 0 .45rem; }
+.ficha-rodape { margin: .6rem 0 0; font-size: .76rem; color: var(--tinta-3); }
+@media (max-width: 640px) { .ficha-rec { grid-template-columns: 1fr; } .ficha-numeros { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .ficha-rec .sit { justify-self: start; padding: 0 .7rem; } }

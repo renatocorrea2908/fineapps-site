@@ -535,6 +535,43 @@ const ROTULO_CLASSE = { aguarda_alcada: 'aguarda a sua alçada', deliberacao_esc
    "está vindo para o meu aceite". A caixa é a mesma do banco; a tela só separa. */
 const eAceite = (p) => p.classe === 'entrega_aguarda_aceite';
 function desenharAprov() { desenharCaixa('aprov'); desenharCaixa('aceite'); }
+/* ── A FICHA DE UMA PÁGINA (M472/D6) ──────────────────────────────────────
+   O que o CEO lê antes de decidir: a pergunta, o negócio, a recomendação de
+   cada executivo e custo/prazo DA CASA (calculados pelo banco, não por quem
+   escreveu). A tela só mostra — nenhum número nasce aqui. */
+const CARGO = { cfo: 'CFO', product: 'CPO', marketing: 'CMO', operations: 'COO / CTO' };
+const POSICAO = { aprovar: ['aprovar', 'ok'], ajustar: ['ajustar', 'espera'], recusar: ['recusar', 'parado'] };
+function desenharFicha(f) {
+  const d = el('div', 'ficha-decisao');
+  const ag = new Map(((RETRATO.estrutura && RETRATO.estrutura.agentes) || []).map((a) => [a.nome, a]));
+  d.append(el('div', 'ficha-rot', 'A decisão'), el('div', 'ficha-pergunta', f.pergunta));
+  if (f.negocio) d.append(el('div', 'ficha-rot', 'O negócio'), el('p', 'ficha-negocio', f.negocio));
+  const recs = Array.isArray(f.recomendacoes) ? f.recomendacoes : [];
+  if (recs.length) {
+    d.appendChild(el('div', 'ficha-rot', 'O que cada executivo recomenda'));
+    const g = el('div', 'ficha-recs');
+    for (const r of recs) {
+      const a = ag.get(r.executivo) || {};
+      const nome = r.executivo === 'operacoes' ? 'Rayn Ops' : (r.persona || a.persona || r.executivo);
+      const quem = el('div', 'ficha-quem'); quem.append(el('b', null, nome), el('small', null, CARGO[a.funcao] || a.funcao || ''));
+      const [pt, tom] = POSICAO[r.posicao] || [r.posicao, ''];
+      const l = el('div', 'ficha-rec'); l.append(quem, el('span', 'sit ' + tom, pt), el('div', null, r.porque || '')); g.appendChild(l);
+    }
+    d.appendChild(g);
+  }
+  const c = f.custo || {}, pz = f.prazo || {};
+  const base = (x) => x && x.base_n != null ? `${x.base_pequena ? 'base pequena: ' : 'base: '}${num(x.base_n)} item(ns) ${x.base === 'mesmo tipo' ? 'do mesmo tipo' : 'de todos os tipos'}` : null;
+  const numeros = el('div', 'ficha-numeros');
+  const caixaN = (v, n, b) => { const x = el('div', 'ficha-num'); x.append(el('div', 'v', v), el('div', 'n', n)); if (b) x.appendChild(el('span', 'base', b)); numeros.appendChild(x); };
+  if (c.estimado_brl != null) caixaN(moeda(c.estimado_brl), 'custo típico de um item como este, pelo histórico da casa', base(c));
+  else if (c.referencia_da_casa) caixaN(moeda(c.ja_gasto_brl), `já gasto; um item como este custa ${moeda(c.referencia_da_casa.custo_mediano_brl)} no meio do histórico`, base(c.referencia_da_casa));
+  if (pz.estimado_horas != null) caixaN(`~${String(Math.round(Number(pz.estimado_horas))).replace('.', ',')} h`, 'do início à entrega, no meio do histórico', base(pz));
+  else if (pz.situacao) caixaN('entregue', pz.situacao, null);
+  if (numeros.childNodes.length) d.append(el('div', 'ficha-rot', 'Custo e prazo, pelo histórico da casa'), numeros);
+  d.appendChild(el('p', 'ficha-rodape', `Ficha escrita pela Triagem ${quando(f.escrita_em)}. Os números vêm do banco; quem escreve a ficha não pode alterá-los.`));
+  return d;
+}
+
 function desenharCaixa(modo) {
   const ehAceite = modo === 'aceite';
   const porId = new Map(todosItens().map((i) => [i.id, i]));
@@ -550,6 +587,13 @@ function desenharCaixa(modo) {
     : ehAceite ? `${lista.length} entrega(s) prontas que só fecham com o seu aceite (ou recusa com motivo). As mais antigas primeiro.`
                : `${lista.length} item(ns) não começam até você decidir. As mais antigas primeiro.`;
   const alvo = $('lista-' + modo); alvo.replaceChildren();
+  // (M472/D6) o que já subiu e ainda não tem a ficha: você vê que existe, mas só decide com a ficha
+  const prep = (((RETRATO.inbox && RETRATO.inbox.em_preparo) || {}).itens || []).filter((x) => (x.classe === 'entrega_aguarda_aceite') === ehAceite);
+  if (prep.length) {
+    const f = el('div', 'em-preparo'); f.appendChild(el('span', 'ponto'));
+    f.appendChild(el('span', null, `${num(prep.length)} decisão(ões) em preparo: a Triagem está escrevendo a ficha de uma página. ${prep.length === 1 ? 'Ela chega' : 'Elas chegam'} aqui quando estiver${prep.length === 1 ? '' : 'em'} completa${prep.length === 1 ? '' : 's'}.`));
+    f.title = prep.map((x) => x.titulo).join('\n'); alvo.appendChild(f);
+  }
   if (!lista.length) alvo.appendChild(vazioGrande(ehAceite ? 'Aceitações limpas' : 'Aprovações limpas', total ? 'Nada com os filtros atuais.' : limpo));
   for (const p of lista) {
     const i = porId.get(p.id);
@@ -575,7 +619,10 @@ function desenharCaixa(modo) {
     dirA.appendChild(esp);
     if (Number(p.custo_ja_gasto) > 0) dirA.appendChild(el('span', 'dinheiro', moeda(p.custo_ja_gasto)));
     m.appendChild(dirA);
-    cx.append(m, el('p', 'porque', p.porque_voce)); subirDir(cx);
+    cx.append(m); subirDir(cx);
+    const ficha = p.contexto && p.contexto.ficha;
+    if (ficha && ficha.pergunta) cx.appendChild(desenharFicha(ficha));
+    else cx.appendChild(el('p', 'porque', p.porque_voce));
     if (i && i.descricao) { const d = chave(el('details'), 'det:pedido:' + p.id); d.append(el('summary', null, 'Ver o pedido inteiro'), el('div', 'descricao', i.descricao)); cx.appendChild(d); }
     if (p.classe === 'aguarda_alcada') {
       // (M455) A pergunta que o CEO já fez sobre este item, e a resposta quando
@@ -586,7 +633,7 @@ function desenharCaixa(modo) {
         q.appendChild(el('p', 'porque', `Você perguntou${pg.em ? ' em ' + quando(pg.em) : ''}: “${pg.texto || '—'}”`));
         q.appendChild(pg.resposta
           ? el('p', 'porque resposta', `Resposta${pg.respondida_em ? ' em ' + quando(pg.respondida_em) : ''}: ${pg.resposta}`)
-          : el('p', 'dica', pg.estado === 'cancelled' ? 'A pergunta foi cancelada.' : 'Sem resposta ainda — o COO responde pela oficina; a resposta também chega na aba Avisos.'));
+          : el('p', 'dica', pg.estado === 'cancelled' ? 'A pergunta foi cancelada.' : 'Sem resposta ainda — o Rayn Ops (COO / CTO) responde pela oficina; a resposta também chega na aba Avisos.'));
         cx.appendChild(q);
       }
       // ⚠ Três saídas, não uma: aprovar, reprovar (o NÃO com motivo — vai para
@@ -596,7 +643,7 @@ function desenharCaixa(modo) {
         ['Aprovar', 'company_os_minha_aprovacao', 'p_observacao', { p_canal: 'tela-os' }],
         ['Questionar', 'company_os_questionar', 'p_pergunta'],
         ['Reprovar', 'company_os_reprovar', 'p_motivo', null, 'perigo'],
-      ], 'Motivo (para aprovar ou reprovar) ou a pergunta ao COO (para questionar) — mínimo 10 letras'));
+      ], 'Motivo (para aprovar ou reprovar) ou a pergunta ao COO / CTO (para questionar) — mínimo 10 letras'));
     }
     if (p.classe === 'entrega_aguarda_aceite') {
       const ref = (p.contexto && p.contexto.referencia) || '';
@@ -694,7 +741,7 @@ const C_LEVEL = [
   { papel: 'CFO', nome: 'Jack Check', filas: ['financeiro'], agente: 'jack-check' },
   { papel: 'CMO', nome: 'Phill Mark', filas: ['marketing'], agente: 'phill-mark' },
   { papel: 'CPO', nome: 'John Prod', filas: ['produto'], agente: 'john-prod' },
-  { papel: 'COO', nome: 'Jonhy Ops', filas: ['operacoes', 'engenharia'], agente: 'operacoes' },
+  { papel: 'COO / CTO', nome: 'Rayn Ops', filas: ['operacoes', 'engenharia'], agente: 'operacoes' },
 ];
 function contagens(lista) {
   return { abertos: lista.filter(aberto).length, parados: lista.filter((i) => aberto(i) && pendente(i)).length, exec: lista.filter((i) => i.estado === 'in_progress').length };
@@ -735,14 +782,14 @@ function desenharOrg() {
   for (const c of C_LEVEL) {
     const dos = base.filter((i) => c.filas.includes(i.fila));
     const pressed = Array.isArray(F.fila) ? JSON.stringify(F.fila) === JSON.stringify(c.filas) : c.filas.length === 1 && F.fila === c.filas[0];
-    nivelC.appendChild(caixa(c.papel === 'COO' ? 'coo' : '', c.papel, c.nome, 'fila ' + c.filas.join(' + '), contagens(dos), pressed, () => alternar('fila', c.filas.length === 1 ? c.filas[0] : c.filas)));
+    nivelC.appendChild(caixa(c.agente === 'operacoes' ? 'coo' : '', c.papel, c.nome, 'fila ' + c.filas.join(' + '), contagens(dos), pressed, () => alternar('fila', c.filas.length === 1 ? c.filas[0] : c.filas)));
   }
   org.appendChild(nivelC);
 
   // Produtos e squads ficam sob o COO (Operations): um nível inteiro, para não
   // espremer o organograma numa coluna só.
   org.appendChild(el('div', 'org-ligacao'));
-  org.appendChild(el('div', 'org-rotulo', 'Produtos — sob o COO'));
+  org.appendChild(el('div', 'org-rotulo', 'Produtos — sob o COO / CTO'));
   const prods = el('div', 'org-nivel');
   const nomes = [...(RETRATO.estrutura.produtos || []).map((p) => p.nome)];
   if (base.some((i) => !i.produto)) nomes.push('— sem produto —');
@@ -781,7 +828,7 @@ const TIPOS = {
   decision: 'decisão', product: 'produto',
   // (M455) os 12 que faltavam — o catálogo é `company_os.tipos_de_trabalho` (23 tipos em 25/09);
   // `analytical_research` é o tipo de toda pergunta do CEO ao COO e saía como "analytical research".
-  analytical_research: 'pergunta ao COO', cpi: 'melhoria contínua', exception: 'exceção',
+  analytical_research: 'pergunta ao COO / CTO', cpi: 'melhoria contínua', exception: 'exceção',
   financial_analysis: 'análise financeira', governance_approval: 'aprovação de governança',
   maintenance: 'manutenção', market_analysis: 'análise de mercado', performance: 'desempenho',
   policy_change: 'mudança de política', pricing: 'preço', process_improvement: 'melhoria de processo',
@@ -1010,14 +1057,14 @@ function desenharAvisos() {
     // (M455) A resposta do COO chega como OUTRO aviso nesta fila (origem
     //    `resposta-ao-ceo`) — é o único caminho que o CEO lê sem depender de
     //    ninguém. O que a tela pode dizer aqui é que a pergunta existe e onde ela está.
-    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em Organograma.'))
+    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO / CTO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em Organograma.'))
     else {
-      const inp = chave(el('input'), 'perg:' + a.id); inp.placeholder = 'Perguntar ao COO (mínimo 10 letras)'
+      const inp = chave(el('input'), 'perg:' + a.id); inp.placeholder = 'Perguntar ao COO / CTO (mínimo 10 letras)'
       const b2 = el('button', 'btn', 'Perguntar')
       b2.addEventListener('click', () => {
         if (inp.value.trim().length < 10) { mostrar($('msg-avisos'), 'Escreva a pergunta (mínimo 10 letras).', false); return }
         acaoAviso('company_os_perguntar_ao_coo', { p_aviso_id: a.id, p_pergunta: inp.value.trim() },
-                  'Pergunta aberta ao COO, com o fato medido junto.', inp)
+                  'Pergunta aberta ao COO / CTO, com o fato medido junto.', inp)
       })
       caixa.append(inp, b2)
     }
@@ -1073,9 +1120,15 @@ function desenharMonitor() {
   desenharRampas();
   const robosDesligados = desenharRobos();
   if (robosDesligados) { const pm = $('pill-monitor'); pm.hidden = false; pm.className = 'pill vermelho'; pm.textContent = String(vig.vermelhos.length + robosDesligados); pm.title = `${robosDesligados} robô(s) desligado(s) no GitHub`; }
-  linhas($('mon-executor'), (p.despachos || []).slice(0, 10).map((d) => [
-    `${d.evento === 'company-os-liberado' ? 'executor acordado' : d.evento === 'company-os-entrega-aceita' ? 'conclusão acordada' : d.evento === 'company-os-pedido-novo' ? 'triagem acordada' : d.evento} · ${d.titulo || ''}`.trim(),
-    `${quando(d.quando)}${d.enviado ? '' : ' · NÃO enviado'}`]));
+  const pista = (d) => { const m = String(d.detalhe || '').match(/pista ([\w-]+)/); return m ? m[1] : ''; };
+  const situacao = (d) => d.enviado ? 'enviado' : /^FREIO/.test(d.detalhe || '') ? 'segurado pelo freio' : /^ROBÔ DESLIGADO/.test(d.detalhe || '') ? 'guardado (robô desligado)' : 'não enviado';
+  tabelaExcel('mon-despachos', [
+    { rot: 'Quando', valor: (d) => d.quando, texto: (d) => quando(d.quando), filtro: (d) => dia(d.quando) },
+    { rot: 'Evento', valor: (d) => NOME_EVENTO[d.evento] || d.evento },
+    { rot: 'Item', valor: (d) => d.titulo || '—', celula: (d) => { const b = el('button', 'btn-texto', d.titulo || '—'); if (d.work_item_id && todosItens().some((x) => x.id === d.work_item_id)) b.addEventListener('click', () => abrirGaveta(d.work_item_id)); return b; } },
+    { rot: 'Pista', valor: pista },
+    { rot: 'Situação', valor: situacao, celula: (d) => el('span', 'sit ' + (d.enviado ? 'ok' : 'parado'), situacao(d)) },
+  ], p.despachos || [], { barra: 'barra-despachos', unidade: 'despacho(s)' });
   const dv = RETRATO.desvios || {};
   const pares = Object.entries(dv.por_desvio || {}).map(([k, v]) => [k, num(v)]);
   pares.push(['passos no caminho / total', `${num(dv.passos && dv.passos.no_caminho)} / ${num(dv.passos && dv.passos.total)}`]);
@@ -1091,46 +1144,76 @@ function desenharMonitor() {
    GitHub e ninguém soube: o banco mandava evento e o GitHub jogava fora. Agora
    o próprio GitHub diz o estado a cada rodada, o banco para de mandar para robô
    desligado e avisa — e a tela mostra aqui. Desligado = vermelho, sempre. */
-const PARA_QUE = { 'oficina-os.yml': 'executa os itens da fila', 'oficina-ci.yml': 'Aceite Técnico: o CI decide a entrega',
-                   'oficina-entrega.yml': 'faz o merge da entrega aceita', 'council-os.yml': 'Triagem: classifica e divide pedidos' };
+const PARA_QUE_TIT = { 'oficina-os.yml': 'Executor', 'oficina-ci.yml': 'Aceite Técnico', 'oficina-entrega.yml': 'Merge', 'council-os.yml': 'Triagem' };
+const PARA_QUE = { 'oficina-os.yml': 'Pega o item liberado da fila e faz o trabalho (código, teste, PR).',
+                   'oficina-ci.yml': 'Espera o CI do PR e aceita ou recusa a entrega técnica.',
+                   'oficina-entrega.yml': 'Faz o merge da entrega aceita e conclui o item.',
+                   'council-os.yml': 'Classifica e divide pedidos novos, decide o técnico travado e escreve a ficha das decisões que sobem para você.' };
 function desenharRobos() {
   const alvo = $('robos'); if (!alvo) return 0; alvo.replaceChildren();
   const robos = (RETRATO.estrutura && RETRATO.estrutura.robos) || null;
   if (!robos) { linVazia(alvo, 'O banco ainda não mede os robôs (chega com a M467).'); return 0; }
   if (!robos.length) { linVazia(alvo, 'Nenhuma medição ainda — ela acontece na próxima rodada da Oficina ou da Triagem.'); return 0; }
   let desligados = 0;
+  /* (M473) Cada robô tem o SEU interruptor. Desligado por você: nada é enviado a
+     ele, o que chegar fica guardado e sai sozinho quando você religar. Desligado
+     NO GITHUB (sem ser por você) continua vermelho: é defeito, não escolha. */
   for (const r of robos) {
-    const ligado = r.estado === 'active'; const sabe = r.estado !== 'desconhecido';
-    if (sabe && !ligado) desligados++;
-    const sit = el('span', 'sit ' + (ligado ? 'ok' : sabe ? 'parado' : ''), ligado ? 'ligado' : sabe ? 'DESLIGADO' : 'sem medição');
-    const partes = [sit, PARA_QUE[r.workflow] || r.workflow];
-    if (Number(r.recusados_7d) > 0) partes.push(`${num(r.recusados_7d)} evento(s) guardado(s) — saem sozinhos quando ele voltar`);
-    alvo.appendChild(lin(r.nome, partes, r.fresco ? `medido ${quando(r.medido_em).split(', ')[1] || ''}` : 'medição velha',
-      !ligado && sabe ? `desde ${quando(r.mudou_em)}` : null, null, !ligado && sabe ? 'quente' : null));
+    const noGit = r.estado === 'active'; const sabe = r.estado !== 'desconhecido';
+    const tem = 'pausado' in r; const pausado = !!r.pausado;
+    if (sabe && !noGit) desligados++;
+    const bloco = el('div', 'robo' + (pausado ? ' pausado' : (sabe && !noGit) ? ' quente' : ''));
+    const cab = el('div', 'rampa-cab');
+    const estado = pausado ? ['parado', 'Desligado por você'] : !sabe ? ['', 'sem medição'] : noGit ? ['ok', 'Ligado'] : ['parado', 'DESLIGADO no GitHub'];
+    cab.append(el('b', null, PARA_QUE_TIT[r.workflow] || r.nome), el('span', 'sit ' + estado[0], estado[1]));
+    bloco.appendChild(cab);
+    bloco.appendChild(el('p', null, PARA_QUE[r.workflow] || r.nome));
+    const rod = [];
+    if (pausado) rod.push(`Desligado em ${quando(r.pausado_em)}: ${r.pausado_motivo || ''}`);
+    else if (sabe && !noGit) rod.push(`Desligado no GitHub desde ${quando(r.mudou_em)} — religar em GitHub → Actions → Enable workflow`);
+    if (Number(r.recusados_7d) > 0) rod.push(`${num(r.recusados_7d)} evento(s) guardado(s) — saem sozinhos quando ele voltar`);
+    rod.push(r.fresco ? `estado medido ${quando(r.medido_em)}` : 'medição do GitHub velha');
+    bloco.appendChild(el('p', 'motivo-fonte', rod.join(' · ')));
+    if (tem) {
+      const mudar = chave(el('details'), 'det:robo:' + r.workflow); mudar.appendChild(el('summary', null, pausado ? 'Religar…' : 'Desligar…'));
+      const form = el('div', 'acao-caixa');
+      const motivo = chave(el('input'), 'robo:' + r.workflow); motivo.type = 'text'; motivo.placeholder = (pausado ? 'Por que religar' : 'Por que desligar') + ' (mínimo 10 letras)';
+      const tit = PARA_QUE_TIT[r.workflow] || r.nome;
+      const b = el('button', 'btn ' + (pausado ? 'sec' : 'perigo'), pausado ? `Religar ${tit}` : `Desligar ${tit}`); const msg = el('p', 'aviso'); msg.hidden = true;
+      b.addEventListener('click', async () => { b.disabled = true; try { const j = await rpc('company_os_ligar_robo', { p_workflow: r.workflow, p_ligado: pausado, p_motivo: motivo.value.trim() }); motivo.value = ''; await abrirCasa(); toast(`${tit}: ${pausado ? 'religado' : 'desligado'}.${j && Number(j.reenviados) ? ` ${j.reenviados} evento(s) guardado(s) reenviado(s).` : ''}`); } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; } });
+      form.append(motivo, b, msg);
+      if (!pausado) form.appendChild(el('p', 'dica', 'O que já está rodando termina. Daqui em diante nada é enviado a ele; o que chegar fica guardado.'));
+      mudar.appendChild(form); bloco.appendChild(mudar);
+    }
+    alvo.appendChild(bloco);
   }
   return desligados;
 }
 
+/* (26/09, pedido do CEO) A rampa mostra O QUE FAZ — ligada e desligada —, não a
+   ata da última mudança ("C3 resolvido.", parágrafo técnico): isso é histórico.
+   O texto daqui vale até a M473 chegar; depois é o mesmo que vem do banco. */
 const RAMPAS_TEXTO = {
-  '7b': ['Aceite Técnico', 'Entrega técnica não volta para você: com PR, o CI decide; sem PR, o CTO confere; item técnico travado é decidido pelo CTO.', true],
-  '7c': ['Aceite CEO', 'O que você já aprovou na entrada não volta para o seu aceite: o CI aceita e você é informado.', true],
-  freio_automatico: ['Stop por Custo Atingido', 'Com o teto de gasto do mês atingido, a casa para de despachar trabalho sozinha. Desligado, o gasto é só medido.', false],
-  plantao: ['Operações', 'O executor é acordado sozinho quando há item liberado na pista. Desligado, nada é despachado automaticamente.', false],
+  '7b': ['Aceite Técnico', 'Entrega técnica não volta para você. Com PR, o CI decide se aceita; sem PR, o CTO confere. Item técnico travado é decidido pelo CTO.', true],
+  '7c': ['Aceite CEO', 'O que você já aprovou na entrada não volta para o seu aceite na saída: o CI aceita e você é informado.', true],
+  freio_automatico: ['Stop por Custo Atingido', 'Para a casa quando o gasto do dia ou do mês passa do teto: nada novo é despachado até o gasto voltar para dentro. Desligada, o gasto só é medido e a casa segue.', false],
+  plantao: ['Operações', 'Liga o trabalho automático: quando um item é liberado, o executor é acordado sozinho. Desligada, nada é despachado — os itens esperam na fila até ela voltar.', false],
 };
 function desenharRampas() {
   const pr = $('painel-rampas'); if (!pr) return; pr.replaceChildren();
   const rampas = (RETRATO.estrutura && RETRATO.estrutura.rampas) || [];
   if (!rampas.length) { pr.appendChild(el('p', 'dica', 'Nenhuma rampa declarada.')); return; }
-  const ordenadas = rampas.slice().sort((a, b) => Number(!!(b.fixa ?? (RAMPAS_TEXTO[b.nome] || [])[2])) - Number(!!(a.fixa ?? (RAMPAS_TEXTO[a.nome] || [])[2])));
+  const fixaDe = (r) => !!(r.fixa ?? (RAMPAS_TEXTO[r.nome] || [])[2]);
+  const ordenadas = rampas.slice().sort((a, b) => Number(fixaDe(b)) - Number(fixaDe(a)));
   for (const r of ordenadas) {
-    const [titL, explL, fixaL] = RAMPAS_TEXTO[r.nome] || [r.nome, '', false];
-    const tit = r.rotulo || titL; const expl = r.descricao || explL; const fixa = r.fixa ?? fixaL;
+    const [titL, explL] = RAMPAS_TEXTO[r.nome] || [r.nome, ''];
+    const tit = r.rotulo || titL; const expl = explL || r.descricao; const fixa = fixaDe(r);
     const bloco = el('div', 'rampa' + (fixa ? ' fixa' : ''));
-    const cab = el('div', 'rampa-cab'); cab.append(el('b', null, tit), el('span', 'sit ' + (r.ligada ? 'ok' : ''), fixa ? 'Fixa · sempre habilitada' : r.ligada ? 'Ligada' : 'Desligada'));
+    const cab = el('div', 'rampa-cab'); cab.append(el('b', null, tit), el('span', 'sit ' + (r.ligada ? 'ok' : 'parado'), fixa ? 'Regra fixa' : r.ligada ? 'Ligada' : 'Desligada'));
     bloco.appendChild(cab);
     if (expl) bloco.appendChild(el('p', null, expl));
-    if (fixa) { bloco.appendChild(el('p', 'motivo-fonte', 'Regra fixa da casa: não tem liga/desliga (decisão do CEO em 26/09/2026).')); pr.appendChild(bloco); continue; }
-    bloco.appendChild(el('p', 'motivo-fonte', `${r.motivo} — ${quando(r.mudada_em)}`));
+    if (fixa) { bloco.appendChild(el('p', 'motivo-fonte', 'Sempre ligada — regra da casa desde 21/09/2026, sem liga/desliga.')); pr.appendChild(bloco); continue; }
+    bloco.appendChild(el('p', 'motivo-fonte', `${r.ligada ? 'Ligada' : 'Desligada'} desde ${quando(r.mudada_em)}`));
     const mudar = chave(el('details'), 'det:rampa:' + r.nome); mudar.appendChild(el('summary', null, r.ligada ? 'Desligar…' : 'Ligar…'));
     bloco.appendChild(mudar); pr.appendChild(bloco);
     const form = el('div', 'acao-caixa');
@@ -1140,6 +1223,10 @@ function desenharRampas() {
     form.append(motivo, b, msg); mudar.appendChild(form);
   }
 }
+
+const NOME_EVENTO = { 'company-os-liberado': 'Executor acordado', 'company-os-entrega-tecnica': 'Aceite Técnico acordado', 'company-os-entrega-aceita': 'Merge acordado',
+  'company-os-pedido-novo': 'Triagem: pedido novo', 'company-os-quebrar': 'Triagem: dividir item', 'company-os-decidir-tecnico': 'CTO: decidir item técnico',
+  'company-os-conferir-entrega': 'CTO: conferir entrega', 'company-os-ficha': 'Triagem: ficha de decisão' };
 
 /* ── TABELA ESTILO EXCEL ──────────────────────────────────────────────────
    Pedido do CEO (26/09): "filtro nos títulos, estilo Excel". Cada título abre
@@ -1313,6 +1400,45 @@ function esteira(alvo) {
   return { naFila: naFila.length, liberados, segurados: segurados.length, exec: exec.length, emAceite: emAceite.length, reguaParada };
 }
 
+/* ── CUSTO MÉDIO POR… (26/09, pedido do CEO) ──────────────────────────────
+   Uma medida só — o custo real do mês, a mesma régua dos itens — aberta por
+   agente, squad, cliente, produto e fila. Por agente vem do banco (M473: cada
+   rodada leva a sua fatia); os outros são recortes dos itens já rateados. */
+const NOME_AGENTE = { 'executor-actions': 'Executor (Oficina)', 'council-actions': 'Triagem (Council)', 'histórico': 'Histórico (antes da medição por rodada)' };
+let MEDIA_POR = 'squad';
+function desenharMedias(cu, itensC, filtrado) {
+  const alvo = $('medias-por'); if (!alvo) return;
+  const sel = $('medias-seletor'); sel.replaceChildren();
+  const dims = [['agente', 'Agente'], ['squad', 'Squad'], ['cliente', 'Cliente'], ['produto', 'Produto'], ['fila', 'Fila']];
+  for (const [k, r] of dims) {
+    const b = el('button', 'badge', r); b.type = 'button'; b.setAttribute('aria-pressed', String(MEDIA_POR === k));
+    b.addEventListener('click', () => { MEDIA_POR = k; desenharMedias(cu, itensC, filtrado); }); sel.appendChild(b);
+  }
+  const porId = new Map(todosItens().map((i) => [i.id, i]));
+  let linhasM;
+  if (MEDIA_POR === 'agente') {
+    linhasM = (cu.por_agente || []).map((a) => ({ grupo: NOME_AGENTE[a.agente] || a.agente, itens: Number(a.itens) || 0, rodadas: Number(a.rodadas) || 0, custo: Number(a.custo_real) || 0 }));
+  } else {
+    const chaveDe = { squad: (i) => i.squad || (porId.get(i.id) || {}).squad || '—', cliente: (i) => i.empresa || '—', produto: (i) => i.produto || '— sem produto —', fila: (i) => i.fila || '—' }[MEDIA_POR];
+    const g = new Map();
+    for (const i of itensC) { const k = chaveDe(i); const x = g.get(k) || { grupo: k, itens: 0, rodadas: 0, custo: 0 }; x.itens++; x.rodadas += Number(i.rodadas) || 0; x.custo += Number(i.custo_real) || 0; g.set(k, x); }
+    linhasM = [...g.values()];
+  }
+  const rot = dims.find(([k]) => k === MEDIA_POR)[1];
+  tabelaExcel('medias-por', [
+    { rot, valor: (l) => l.grupo },
+    { rot: 'Itens', n: 1, valor: (l) => l.itens, texto: (l) => num(l.itens), somar: num },
+    { rot: 'Rodadas', n: 1, valor: (l) => l.rodadas, texto: (l) => num(l.rodadas), somar: num },
+    { rot: 'Custo real', n: 1, valor: (l) => l.custo, texto: (l) => moeda(l.custo), somar: moeda },
+    { rot: 'Médio por item', n: 1, valor: (l) => (l.itens ? l.custo / l.itens : 0), texto: (l) => (l.itens ? moeda(l.custo / l.itens) : '—') },
+    { rot: 'Médio por rodada', n: 1, valor: (l) => (l.rodadas ? l.custo / l.rodadas : 0), texto: (l) => (l.rodadas ? moeda(l.custo / l.rodadas) : '—') },
+  ], linhasM, { barra: 'barra-medias', unidade: 'grupo(s)' });
+  const nota = $('medias-nota');
+  nota.textContent = MEDIA_POR === 'agente'
+    ? (cu.por_agente ? `Por agente não segue os filtros de cima. A Triagem roda sem item e fica fora do rateio: ${num(cu.triagem && cu.triagem.rodadas)} rodadas este mês.` : 'O custo por agente chega com a M473.')
+    : `${MEDIA_POR === 'cliente' ? 'Cliente = a empresa dona do item. ' : ''}${filtrado ? 'Segue os filtros de cima.' : ''}`;
+}
+
 /* ── ABA Custos ───────────────────────────────────────────────────────────── */
 function desenharCustos() {
   desenharMedidor($('medidor-consumo'));
@@ -1330,44 +1456,46 @@ function desenharCustos() {
   const passaC = (i) => (!F.empresa || i.empresa === F.empresa) && (!F.produto || (i.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, i.fila));
   const itensC = (cu.itens || []).filter(passaC);
   const realF = itensC.reduce((s, i) => s + Number(i.custo_real || 0), 0);
-  const consumoF = itensC.reduce((s, i) => s + Number(i.consumo || 0), 0);
   const minutosF = itensC.reduce((s, i) => s + Number(i.minutos || 0), 0);
   const ac = cu.actions || {};
   const k = $('kpis-custos'); k.replaceChildren();
-  kpi(k, 'Custo fixo do mês', moeda(cu.fixos_brl), `${(cu.fixos || []).length} contratos · câmbio ${Number(cu.cambio || 0).toFixed(2)}`);
+  // (26/09, CEO) o card diz QUAIS são os contratos e quanto cada um vale — a lista miúda cabe no próprio card
+  const kf = kpi(k, 'Custo fixo do mês', moeda(cu.fixos_brl), null);
+  const lf = el('div', 's lista-fixos');
+  for (const f of (cu.fixos || [])) lf.appendChild(el('span', null, `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' = ' : ''}${moeda(f.valor_brl)}`));
+  if (Number(cu.cambio)) lf.appendChild(el('span', 'cambio', `câmbio ${Number(cu.cambio).toFixed(2).replace('.', ',')}`));
+  kf.appendChild(lf);
   kpi(k, 'GitHub Actions no mês', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min além da franquia = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
-  kpi(k, 'Custo real do mês', moeda(cu.custo_real_total), cu.provisorio ? 'fixos + excedente · provisório até o mês fechar' : 'mês fechado');
-  kpi(k, 'Rateado nos itens' + (filtrado ? ' (filtro)' : ''), moeda(realF), `${num(itensC.length)} tarefa(s) · ${num(cu.rodadas)} rodadas no mês`);
-  kpi(k, 'Consumo (chave de rateio)' + (filtrado ? ' (filtro)' : ''), moeda(consumoF), 'valor de tabela dos tokens — não é cobrança');
-  kpi(k, 'Custo médio por tarefa', itensC.length ? moeda(realF / itensC.length) : '—', 'do custo real rateado');
+  kpi(k, 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : cu.provisorio ? 'fixos + excedente de Actions · provisório até o mês fechar' : 'mês fechado');
+  kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo real ÷ ${num(itensC.length)} item(ns) trabalhados no mês`);
   kpi(k, 'Parado esperando você', moeda(c.gasto_parado_esperando_voce), 'consumo já feito em itens travados');
 
-  // custo real por tarefa
-  $('sub-custeio').textContent = `${dia(cu.mes)} · ${num(itensC.length)} tarefa(s)${filtrado ? ' (com filtro)' : ''}`;
+  // custo real por item
+  $('sub-custeio').textContent = `${cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ''}`;
+  desenharMedias(cu, itensC, filtrado);
   const celEmpresa = (i) => { const f = document.createDocumentFragment(); f.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —')); return f; };
   const nume = (k) => (i) => Number(i[k]) || 0;
   tabelaExcel('custeio-itens', [
-    { rot: 'Tarefa', valor: (i) => i.titulo, celula: (i) => { const b = el('button', 'btn-texto', i.titulo); if (todosItens().some((x) => x.id === i.id)) b.addEventListener('click', () => abrirGaveta(i.id)); return b; } },
+    { rot: 'Item', valor: (i) => i.titulo, celula: (i) => { const b = el('button', 'btn-texto', i.titulo); if (todosItens().some((x) => x.id === i.id)) b.addEventListener('click', () => abrirGaveta(i.id)); return b; } },
     { rot: 'Fila', valor: (i) => i.fila, celula: (i) => tag(i.fila, 'fila', i.fila) },
     { rot: 'Empresa / produto', valor: (i) => `${i.empresa} / ${i.produto || 'sem produto'}`, celula: celEmpresa },
     { rot: 'Rodadas', n: 1, valor: nume('rodadas'), texto: (i) => num(i.rodadas) },
-    { rot: 'Fatia', n: 1, valor: nume('fatia'), texto: (i) => `${Number(i.fatia || 0).toFixed(1)}%` },
     { rot: 'Fixos rateados', n: 1, valor: nume('fixos_rateados'), texto: (i) => moeda(i.fixos_rateados), somar: moeda },
     { rot: 'Actions', n: 1, valor: nume('actions_brl'), texto: (i) => moeda(i.actions_brl), somar: moeda },
     { rot: 'Custo real', n: 1, valor: nume('custo_real'), texto: (i) => moeda(i.custo_real), somar: moeda },
-  ], itensC, { barra: 'barra-custeio', unidade: 'tarefa(s)' });
+  ], itensC, { barra: 'barra-custeio', unidade: 'item(ns)' });
 
   // por fila (custo real)
   const filas = (RETRATO.estrutura.filas || []).map((f) => f.nome);
   const t = $('custos-filas'); t.replaceChildren();
-  const cab = el('tr'); for (const [h, n] of [['Fila', 0], ['Tarefas', 1], ['Rodadas', 1], ['Consumo', 1], ['Custo real', 1]]) cab.appendChild(el('th', n ? 'n' : '', h)); t.appendChild(cab);
+  const cab = el('tr'); for (const [h, n] of [['Fila', 0], ['Itens', 1], ['Rodadas', 1], ['Custo real', 1], ['Médio por item', 1]]) cab.appendChild(el('th', n ? 'n' : '', h)); t.appendChild(cab);
   for (const f of filas) {
     const dos = itensC.filter((i) => i.fila === f); if (!dos.length && F.fila && !bate(F.fila, f)) continue;
     const l = el('tr', 'clicavel' + (bate(F.fila, f) ? ' ativa' : ''));
-    l.append(el('td', null, f), el('td', 'n', num(dos.length)), el('td', 'n', num(dos.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.consumo || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.custo_real || 0), 0))));
+    l.append(el('td', null, f), el('td', 'n', num(dos.length)), el('td', 'n', num(dos.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.custo_real || 0), 0))), el('td', 'n', dos.length ? moeda(dos.reduce((s, i) => s + Number(i.custo_real || 0), 0) / dos.length) : '—'));
     l.addEventListener('click', () => alternar('fila', f)); t.appendChild(l);
   }
-  const tot = el('tr', 'total'); tot.append(el('td', null, 'Total'), el('td', 'n', num(itensC.length)), el('td', 'n', num(itensC.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(consumoF)), el('td', 'n', moeda(realF))); t.appendChild(tot);
+  const tot = el('tr', 'total'); tot.append(el('td', null, 'Total'), el('td', 'n', num(itensC.length)), el('td', 'n', num(itensC.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(realF)), el('td', 'n', itensC.length ? moeda(realF / itensC.length) : '—')); t.appendChild(tot);
   // A mesma soma da tabela, desenhada: uma medida, uma régua, o rótulo no texto.
   const bf = $('barras-filas'); bf.replaceChildren();
   const porFila = filas.map((f) => [f, itensC.filter((i) => i.fila === f).reduce((s, i) => s + Number(i.custo_real || 0), 0)]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
@@ -1387,7 +1515,7 @@ function desenharCustos() {
     pf.append(linha, el('p', 'motivo', f.motivo));
   }
   const totF = el('div', 'atual total-fixos'); totF.append(el('span', null, 'Total'), el('span', null, `${moeda(cu.fixos_brl)}/mês`)); pf.appendChild(totF);
-  pf.appendChild(el('p', 'motivo', `Total: ${moeda(cu.fixos_brl)}/mês. Actions: US$ ${Number(ac.preco_minuto_usd || 0).toFixed(3)}/min além de ${num(ac.franquia)} min. Só os minutos das rodadas do executor entram por tarefa; CI de PR e vigias ficam fora.`));
+  pf.appendChild(el('p', 'motivo', `Total: ${moeda(cu.fixos_brl)}/mês. Actions: US$ ${Number(ac.preco_minuto_usd || 0).toFixed(3)}/min além de ${num(ac.franquia)} min. Só os minutos das rodadas do executor entram por item; CI de PR e vigias ficam fora.`));
   const form = el('div', 'acao-caixa');
   const item = chave(el('input'), 'fixo:item'); item.type = 'text'; item.placeholder = 'Contrato (ex.: Vercel Pro)'; item.style.flex = '0 0 11rem';
   const valor = chave(el('input'), 'fixo:valor'); valor.type = 'number'; valor.min = '0'; valor.step = '0.01'; valor.placeholder = 'Valor/mês'; valor.style.flex = '0 0 7rem';

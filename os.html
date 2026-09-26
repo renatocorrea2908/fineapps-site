@@ -235,29 +235,32 @@
         </div>
         <div class="kpis topo-espaco" id="kpis-monitor"></div>
         <div class="grade-2 topo-espaco">
+          <div>
           <div class="cartao">
             <div class="cartao-cab"><h2>Réguas</h2><span class="dica" id="sub-reguas"></span></div>
             <div class="saude" id="saude-reguas"></div>
             <div class="reguas" id="reguas"></div>
           </div>
+          <div class="cartao topo-espaco">
+            <div class="cartao-cab"><h2>Rampas de autonomia</h2><span class="dica">o quanto a casa anda sozinha</span></div>
+            <div class="rampas" id="painel-rampas"></div>
+          </div>
+          </div>
           <div>
             <div class="cartao">
               <div class="cartao-cab"><h2>Robôs do GitHub</h2><span class="dica">quem o OS acorda — medido pelo próprio GitHub</span></div>
-              <div class="linhas-lista" id="robos"></div>
-            </div>
-            <div class="cartao topo-espaco">
-              <div class="cartao-cab"><h2>Rampas de autonomia</h2></div>
-              <div class="rampas" id="painel-rampas"></div>
-            </div>
-            <div class="cartao topo-espaco">
-              <div class="cartao-cab"><h2>Últimos despachos</h2><span class="dica">eventos que acordaram o executor — não são itens</span></div>
-              <div class="linhas" id="mon-executor"></div>
+              <div class="rampas" id="robos"></div>
             </div>
             <div class="cartao topo-espaco">
               <div class="cartao-cab"><h2>Desvios nos últimos 7 dias</h2><span class="dica">contados em passos do caminho</span></div>
               <div class="linhas" id="mon-desvios"></div>
             </div>
           </div>
+        </div>
+        <div class="cartao topo-espaco">
+          <div class="cartao-cab"><h2>Últimos despachos</h2><span class="dica">cada vez que o OS acordou um robô — clique no título de uma coluna para filtrar e ordenar</span></div>
+          <div class="tabela-barra" id="barra-despachos" hidden></div>
+          <div class="tabela-envolve"><table class="tabela" id="mon-despachos"></table></div>
         </div>
       </section>
 
@@ -278,8 +281,14 @@
             <div class="painel-teto" id="painel-fixos"></div>
           </div>
           <div class="cartao cartao-largo">
-            <div class="cartao-cab"><h2>Custo real por tarefa no mês</h2><span class="dica" id="sub-custeio"></span></div>
-            <p class="dica">O que você paga por mês, rateado pelo consumo de cada tarefa, mais os minutos de GitHub Actions além da franquia. Provisório até o mês fechar. Clique num título para filtrar e ordenar.</p>
+            <div class="cartao-cab"><h2>Custo médio por…</h2><div class="chips" id="medias-seletor"></div></div>
+            <p class="dica" id="medias-nota"></p>
+            <div class="tabela-barra" id="barra-medias" hidden></div>
+            <div class="tabela-envolve"><table class="tabela" id="medias-por"></table></div>
+          </div>
+          <div class="cartao cartao-largo">
+            <div class="cartao-cab"><h2>Custo real por item no mês</h2><span class="dica" id="sub-custeio"></span></div>
+            <p class="dica">O que você paga por mês, dividido entre os itens pelo consumo de cada um, mais os minutos de GitHub Actions além da franquia. Provisório até o mês fechar. Clique num título para filtrar e ordenar.</p>
             <div class="tabela-barra" id="barra-custeio" hidden></div>
             <div class="tabela-envolve"><table class="tabela" id="custeio-itens"></table></div>
           </div>
