@@ -1,0 +1,29 @@
+# scan-segredos — o repositório do site é PÚBLICO (medido em 26/09/2026, H3):
+# qualquer segredo que entre aqui está publicado no instante do push. Este é o
+# único guard do repositório, de propósito: o site é HTML/CSS/JS estático sem
+# build, e o que pode dar errado nele é UMA coisa — alguém colar uma chave
+# secreta no os.js. O que o Command Center usa (URL do projeto e a chave
+# `sb_publishable_…`) é público por desenho e passa; o que reprova é o formato
+# das chaves que nunca deveriam sair de um cofre. Mesma classe da regra 16 do
+# stratum: a defesa olha CONTEÚDO, não nome de arquivo.
+name: scan-segredos
+on:
+  push:
+  pull_request:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nenhum segredo no repositório público
+        run: |
+          set -u
+          # formatos: Supabase secret/service_role (sb_secret_, JWT eyJ…), Stripe live/test,
+          # GitHub tokens, chaves privadas, tokens da Vercel, Anthropic.
+          PADRAO='sb_secret_[A-Za-z0-9_-]{10,}|eyJhbGciOi[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}|sk_(live|test)_[A-Za-z0-9]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----|sk-ant-[A-Za-z0-9_-]{20,}|vercel_[A-Za-z0-9]{20,}'
+          if grep -rEIn --exclude-dir=.git --exclude-dir=.github "$PADRAO" . ; then
+            echo "::error title=segredo no repositório público::o padrão acima é de chave secreta — rotacione a chave AGORA (apagar do arquivo não apaga do histórico) e só depois corrija o commit"
+            exit 1
+          fi
+          echo "✓ nenhum formato de chave secreta no repositório"

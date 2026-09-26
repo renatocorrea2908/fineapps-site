@@ -1,2 +1,5 @@
 .vercel
 .env*
+# área de descarte e locks órfãos do Cowork — nunca entram no repositório (mesma regra do stratum)
+_to_delete/
+_locks_orfaos/
