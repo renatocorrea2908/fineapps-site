@@ -420,7 +420,12 @@ button.lin:hover { background: var(--sup-3); }
 /* seis números: uma fileira de 6 ou duas de 3 — nunca 5 + 1 órfão */
 @media (max-width: 1360px) { .kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .kpi .v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kpis-6 .kpi .v { font-size: clamp(1.3rem, 1.1vw + .5rem, 1.75rem); }
+/* ⚠ (26/09) "os números estouram pela lateral": o tamanho do número acompanha a
+   LARGURA DO CARTÃO (container query), não a da tela — R$ 4.510,39 cabe no
+   cartão estreito de Custos e fica grande no largo. */
+.kpi { container-type: inline-size; }
+.kpi .v { font-size: 1.75rem; }
+.kpi .v.longo { font-size: clamp(1.1rem, 12.5cqi, 1.75rem); }
 .grade-inicio { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; margin-top: 1.25rem; align-items: start; }
 .cartao-largo { grid-column: 1 / -1; }
 .exec-status { display: flex; align-items: center; gap: .8rem; padding: .2rem 0 .9rem; }
@@ -653,3 +658,67 @@ button.lin:hover { background: var(--sup-3); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ─────────────────────────── esteira de trabalho ─────────────────────────── */
+.esteira-cartao { margin: 0 0 1.1rem; }
+.esteira { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem; }
+.etapa {
+  position: relative; display: flex; flex-direction: column; gap: .15rem; text-align: left; min-width: 0;
+  padding: .8rem .9rem; border-radius: var(--raio-p); border: 1px solid var(--linha); background: var(--sup-2); color: var(--tinta);
+  font: inherit; transition: border-color .15s, background .15s;
+}
+.etapa:hover { border-color: var(--linha-2); background: var(--sup-3); }
+.etapa:not(:last-child)::after {
+  content: ""; position: absolute; right: -.5rem; top: 50%; width: .45rem; height: .45rem; z-index: 1;
+  border-top: 2px solid var(--linha-2); border-right: 2px solid var(--linha-2); transform: translateY(-50%) rotate(45deg);
+}
+.etapa-rot { font-size: .74rem; font-weight: 600; color: var(--tinta-2); }
+.etapa-n { font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.etapa-sub { display: flex; flex-direction: column; font-size: .74rem; color: var(--tinta-3); line-height: 1.35; }
+.etapa-alerta { display: flex; align-items: center; gap: .3rem; margin-top: .35rem; font-size: .72rem; font-weight: 600; color: var(--erro-tinta); }
+.etapa-alerta .ico { width: .85rem; height: .85rem; }
+.etapa.anda .etapa-n { color: var(--info-tinta); }
+.etapa.espera .etapa-n { color: var(--alerta-tinta); }
+.etapa.alerta { border-color: var(--erro-borda); background: var(--erro-suave); }
+.etapa.alerta .etapa-n { color: var(--erro-tinta); }
+.etapa.parado .etapa-n { color: var(--erro-tinta); }
+.etapa.ok .etapa-n { color: var(--ok-tinta); }
+.etapa.calmo .etapa-n { color: var(--tinta-3); }
+@media (max-width: 1100px) { .esteira { grid-template-columns: repeat(3, minmax(0, 1fr)); } .etapa::after { display: none; } }
+@media (max-width: 720px) { .esteira { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ─────────────────────────── rampas fixas ─────────────────────────── */
+.rampa.fixa .sit { background: var(--marca-suave); color: var(--marca-tinta); }
+
+/* ─────────────────────────── tabela estilo Excel ─────────────────────────── */
+.th-filtro { display: inline-flex; align-items: center; gap: .35rem; background: none; border: 0; padding: .1rem .25rem; margin: -.1rem -.25rem; border-radius: 5px; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.th-filtro .ico { width: .8rem; height: .8rem; opacity: .45; }
+.th-filtro:hover { background: var(--sup-3); color: var(--tinta); }
+.th-filtro:hover .ico { opacity: .9; }
+.th-filtro.ativo { color: var(--marca-tinta); background: var(--marca-suave); }
+.th-filtro.ativo .ico { opacity: 1; }
+.tabela th.n .th-filtro { flex-direction: row-reverse; }
+.tabela-barra { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin: 0 0 .6rem; padding: .45rem .7rem; border-radius: var(--raio-p); background: var(--marca-suave); color: var(--marca-tinta); font-size: .8rem; border: 1px solid var(--marca-borda); }
+.tabela-barra .ico { width: .85rem; height: .85rem; }
+.tabela-barra .btn-texto { margin-left: auto; color: var(--marca-tinta); }
+.filtro-pop {
+  position: absolute; z-index: 90; width: 17rem; padding: .5rem; display: flex; flex-direction: column; gap: .4rem;
+  background: var(--sup); border: 1px solid var(--linha-2); border-radius: var(--raio); box-shadow: var(--sombra-3); animation: aparecer .12s ease-out;
+}
+.filtro-ordem { display: flex; flex-direction: column; padding-bottom: .35rem; border-bottom: 1px solid var(--linha); }
+.filtro-item { display: flex; align-items: center; gap: .5rem; width: 100%; text-align: left; background: none; border: 0; padding: .4rem .5rem; border-radius: 6px; font-size: .82rem; color: var(--tinta-2); }
+.filtro-item .ico { width: .9rem; height: .9rem; }
+.filtro-item:hover { background: var(--sup-3); color: var(--tinta); }
+.filtro-item.ativo { color: var(--marca-tinta); background: var(--marca-suave); }
+.filtro-pop input[type="search"] { padding: .4rem .6rem; font-size: .82rem; }
+.filtro-lista { max-height: 15rem; overflow-y: auto; display: flex; flex-direction: column; margin: 0 -.2rem; }
+.filtro-opcao { display: flex; align-items: center; gap: .5rem; margin: 0; padding: .3rem .45rem; border-radius: 5px; font-size: .82rem; font-weight: 500; color: var(--tinta); cursor: pointer; }
+.filtro-opcao:hover { background: var(--sup-3); }
+.filtro-opcao input { width: auto; margin: 0; accent-color: var(--marca); }
+.filtro-opcao span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filtro-opcao small { color: var(--tinta-3); font-variant-numeric: tabular-nums; }
+.filtro-opcao.todos { font-weight: 600; border-bottom: 1px solid var(--linha); border-radius: 0; margin-bottom: .15rem; }
+.filtro-pe { display: flex; justify-content: flex-end; gap: .4rem; padding-top: .4rem; border-top: 1px solid var(--linha); }
+.filtro-pe .btn { padding: .4rem .9rem; }
+
+.saudacao .data-hoje { text-transform: capitalize; margin: 0 0 .15rem; }

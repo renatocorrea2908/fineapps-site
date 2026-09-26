@@ -110,6 +110,10 @@
       <!-- VISÃO GERAL -->
       <section class="aba" data-aba="inicio">
         <div class="saudacao" id="saudacao"></div>
+        <div class="cartao esteira-cartao">
+          <div class="cartao-cab"><h2>Esteira de trabalho</h2><span class="dica">os mesmos números de Itens e do Monitor · clique numa etapa para ver os itens</span></div>
+          <div class="esteira" id="esteira-inicio"></div>
+        </div>
         <div class="kpis kpis-6" id="kpis-inicio"></div>
         <div class="grade-inicio">
           <div class="cartao">
@@ -121,15 +125,11 @@
             <div id="inicio-executor"></div>
           </div>
           <div class="cartao">
-            <div class="cartao-cab"><h2>Itens em aberto por situação</h2><button class="btn-texto" data-ir="status">Abrir</button></div>
-            <div id="inicio-dist"></div>
-          </div>
-          <div class="cartao">
             <div class="cartao-cab"><h2>Avisos sem ciência</h2><button class="btn-texto" data-ir="avisos">Ver avisos</button></div>
             <div class="linhas-lista" id="inicio-avisos"></div>
           </div>
-          <div class="cartao cartao-largo">
-            <div class="cartao-cab"><h2>Entregue pela régua — últimos 7 dias</h2><span class="dica" id="inicio-regua-n"></span></div>
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Aceito pela régua — 7 dias</h2><span class="dica" id="inicio-regua-n"></span></div>
             <div class="linhas-lista" id="inicio-regua"></div>
           </div>
         </div>
@@ -229,7 +229,11 @@
 
       <!-- MONITOR -->
       <section class="aba" data-aba="monitor" hidden>
-        <div class="kpis" id="kpis-monitor"></div>
+        <div class="cartao esteira-cartao">
+          <div class="cartao-cab"><h2>Esteira de trabalho</h2><span class="dica">os mesmos números da Visão geral e de Itens</span></div>
+          <div class="esteira" id="esteira-monitor"></div>
+        </div>
+        <div class="kpis topo-espaco" id="kpis-monitor"></div>
         <div class="grade-2 topo-espaco">
           <div class="cartao">
             <div class="cartao-cab"><h2>Réguas</h2><span class="dica" id="sub-reguas"></span></div>
@@ -242,11 +246,11 @@
               <div class="rampas" id="painel-rampas"></div>
             </div>
             <div class="cartao topo-espaco">
-              <div class="cartao-cab"><h2>Executor — últimos despachos</h2></div>
+              <div class="cartao-cab"><h2>Últimos despachos</h2><span class="dica">eventos que acordaram o executor — não são itens</span></div>
               <div class="linhas" id="mon-executor"></div>
             </div>
             <div class="cartao topo-espaco">
-              <div class="cartao-cab"><h2>Desvios nos últimos 7 dias</h2></div>
+              <div class="cartao-cab"><h2>Desvios nos últimos 7 dias</h2><span class="dica">contados em passos do caminho</span></div>
               <div class="linhas" id="mon-desvios"></div>
             </div>
           </div>
@@ -271,11 +275,13 @@
           </div>
           <div class="cartao cartao-largo">
             <div class="cartao-cab"><h2>Custo real por tarefa no mês</h2><span class="dica" id="sub-custeio"></span></div>
-            <p class="dica">O que você paga por mês, rateado pelo consumo de cada tarefa, mais os minutos de GitHub Actions além da franquia. Provisório até o mês fechar.</p>
+            <p class="dica">O que você paga por mês, rateado pelo consumo de cada tarefa, mais os minutos de GitHub Actions além da franquia. Provisório até o mês fechar. Clique num título para filtrar e ordenar.</p>
+            <div class="tabela-barra" id="barra-custeio" hidden></div>
             <div class="tabela-envolve"><table class="tabela" id="custeio-itens"></table></div>
           </div>
           <div class="cartao cartao-largo">
             <div class="cartao-cab"><h2>Rodadas recentes</h2><span class="dica" id="sub-lanc"></span></div>
+            <div class="tabela-barra" id="barra-lanc" hidden></div>
             <div class="tabela-envolve"><table class="tabela" id="lancamentos"></table></div>
           </div>
         </div>
@@ -292,6 +298,7 @@
           <div><label for="r-base">Data-base</label><select id="r-base"><option value="criado">Abertura</option><option value="atualizado">Última mudança</option><option value="concluido">Conclusão</option></select></div>
         </div>
         <div class="kpis" id="kpis-report"></div>
+        <div class="tabela-barra topo-espaco" id="barra-report" hidden></div>
         <div class="cartao topo-espaco sem-respiro"><div class="tabela-envolve"><table class="tabela" id="tabela-report"></table></div></div>
       </section>
 
