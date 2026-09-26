@@ -786,28 +786,32 @@ function desenharOrg() {
   }
   org.appendChild(nivelC);
 
-  // Produtos e squads ficam sob o COO (Operations): um nível inteiro, para não
-  // espremer o organograma numa coluna só.
+  // Produtos: uma caixa por produto (clique filtra).
   org.appendChild(el('div', 'org-ligacao'));
-  org.appendChild(el('div', 'org-rotulo', 'Produtos — sob o COO / CTO'));
+  org.appendChild(el('div', 'org-rotulo', 'Produtos'));
   const prods = el('div', 'org-nivel');
   const nomes = [...(RETRATO.estrutura.produtos || []).map((p) => p.nome)];
   if (base.some((i) => !i.produto)) nomes.push('— sem produto —');
   for (const pn of nomes) {
     const dosP = base.filter((i) => (i.produto || '— sem produto —') === pn);
-    const pr = el('div', 'org-ramo');
     const pInfo = (RETRATO.estrutura.produtos || []).find((p) => p.nome === pn);
-    pr.appendChild(caixa('produto', 'Produto', pn, pInfo ? pInfo.empresa : 'itens sem produto', contagens(dosP), F.produto === pn, () => alternar('produto', pn)));
-    pr.appendChild(el('div', 'org-ligacao'));
-    const sq = el('div', 'org-filhos');
-    for (const s of (RETRATO.estrutura.squads || []).filter((s) => ['engenharia', 'operacoes'].includes(s.fila))) {
-      const dosS = dosP.filter((i) => i.fila === s.fila);
-      sq.appendChild(caixa('squad', 'Squad', s.nome, `WIP máx ${s.wip_max}`, contagens(dosS), F.produto === pn && F.fila === s.fila,
-        () => { const mesmo = F.produto === pn && F.fila === s.fila; if (mesmo) { delete F.produto; delete F.fila; } else { F.produto = pn; F.fila = s.fila; } render(); }));
-    }
-    pr.appendChild(sq); prods.appendChild(pr);
+    prods.appendChild(caixa('produto', 'Produto', pn, pInfo ? pInfo.empresa : 'itens sem produto', contagens(dosP), F.produto === pn, () => alternar('produto', pn)));
   }
   org.appendChild(prods);
+
+  // (26/09, E4) As SQUADS são as pistas que executam — todas as abertas, com as
+  // vagas (wip) e quantas estão em execução agora. Até o E4 esta linha só mostrava
+  // a Operações (filtro antigo por fila) e as outras squads pareciam não existir.
+  org.appendChild(el('div', 'org-ligacao'));
+  org.appendChild(el('div', 'org-rotulo', 'Squads — as pistas que executam (sob o COO / CTO)'));
+  const sqs = el('div', 'org-nivel');
+  for (const s of (RETRATO.estrutura.squads || [])) {
+    const dosS = base.filter((i) => i.squad === s.nome);
+    const c = contagens(dosS);
+    const livres = dosS.filter((i) => i.estado === 'ready' && !(i.nao_antes_de && new Date(i.nao_antes_de) > new Date())).length;
+    sqs.appendChild(caixa('squad', 'Squad', s.nome, `${c.exec} de ${s.wip_max} vaga(s) em uso · ${livres} na fila`, c, F.squad === s.nome, () => alternar('squad', s.nome)));
+  }
+  org.appendChild(sqs);
 
   const lista = itens().filter(aberto).sort((a, b) => (pendente(b) - pendente(a)) || new Date(b.atualizado) - new Date(a.atualizado));
   const alvo = $('lista-filas'); alvo.replaceChildren();
