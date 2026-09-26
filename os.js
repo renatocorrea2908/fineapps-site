@@ -1071,6 +1071,8 @@ function desenharMonitor() {
     rg.appendChild(det);
   }
   desenharRampas();
+  const robosDesligados = desenharRobos();
+  if (robosDesligados) { const pm = $('pill-monitor'); pm.hidden = false; pm.className = 'pill vermelho'; pm.textContent = String(vig.vermelhos.length + robosDesligados); pm.title = `${robosDesligados} robô(s) desligado(s) no GitHub`; }
   linhas($('mon-executor'), (p.despachos || []).slice(0, 10).map((d) => [
     `${d.evento === 'company-os-liberado' ? 'executor acordado' : d.evento === 'company-os-entrega-aceita' ? 'conclusão acordada' : d.evento === 'company-os-pedido-novo' ? 'triagem acordada' : d.evento} · ${d.titulo || ''}`.trim(),
     `${quando(d.quando)}${d.enviado ? '' : ' · NÃO enviado'}`]));
@@ -1084,6 +1086,31 @@ function desenharMonitor() {
 /* (M466, 26/09) As rampas têm NOME de gente, e as duas regras de aceite são
    FIXAS da casa — sem botão. O nome e o "fixa" vêm do banco; este mapa só
    cobre o retrato de antes da M466, para a tela não voltar a mostrar código. */
+/* ── ROBÔS DO GITHUB (M467/P-80) ──────────────────────────────────────────
+   De 21 a 26/09 o robô do Aceite Técnico e o do merge ficaram DESLIGADOS no
+   GitHub e ninguém soube: o banco mandava evento e o GitHub jogava fora. Agora
+   o próprio GitHub diz o estado a cada rodada, o banco para de mandar para robô
+   desligado e avisa — e a tela mostra aqui. Desligado = vermelho, sempre. */
+const PARA_QUE = { 'oficina-os.yml': 'executa os itens da fila', 'oficina-ci.yml': 'Aceite Técnico: o CI decide a entrega',
+                   'oficina-entrega.yml': 'faz o merge da entrega aceita', 'council-os.yml': 'Triagem: classifica e divide pedidos' };
+function desenharRobos() {
+  const alvo = $('robos'); if (!alvo) return 0; alvo.replaceChildren();
+  const robos = (RETRATO.estrutura && RETRATO.estrutura.robos) || null;
+  if (!robos) { linVazia(alvo, 'O banco ainda não mede os robôs (chega com a M467).'); return 0; }
+  if (!robos.length) { linVazia(alvo, 'Nenhuma medição ainda — ela acontece na próxima rodada da Oficina ou da Triagem.'); return 0; }
+  let desligados = 0;
+  for (const r of robos) {
+    const ligado = r.estado === 'active'; const sabe = r.estado !== 'desconhecido';
+    if (sabe && !ligado) desligados++;
+    const sit = el('span', 'sit ' + (ligado ? 'ok' : sabe ? 'parado' : ''), ligado ? 'ligado' : sabe ? 'DESLIGADO' : 'sem medição');
+    const partes = [sit, PARA_QUE[r.workflow] || r.workflow];
+    if (Number(r.recusados_7d) > 0) partes.push(`${num(r.recusados_7d)} evento(s) guardado(s) — saem sozinhos quando ele voltar`);
+    alvo.appendChild(lin(r.nome, partes, r.fresco ? `medido ${quando(r.medido_em).split(', ')[1] || ''}` : 'medição velha',
+      !ligado && sabe ? `desde ${quando(r.mudou_em)}` : null, null, !ligado && sabe ? 'quente' : null));
+  }
+  return desligados;
+}
+
 const RAMPAS_TEXTO = {
   '7b': ['Aceite Técnico', 'Entrega técnica não volta para você: com PR, o CI decide; sem PR, o CTO confere; item técnico travado é decidido pelo CTO.', true],
   '7c': ['Aceite CEO', 'O que você já aprovou na entrada não volta para o seu aceite: o CI aceita e você é informado.', true],
