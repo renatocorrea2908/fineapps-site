@@ -416,7 +416,11 @@ button.lin:hover { background: var(--sup-3); }
 .saudacao h2 { font-size: 1.5rem; letter-spacing: -.03em; font-weight: 700; }
 .saudacao p { margin: .3rem 0 0; color: var(--tinta-2); font-size: .92rem; }
 .saudacao .resumo b { color: var(--tinta); font-weight: 650; }
-.kpis-6 { grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
+.kpis-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+/* seis números: uma fileira de 6 ou duas de 3 — nunca 5 + 1 órfão */
+@media (max-width: 1360px) { .kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.kpi .v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kpis-6 .kpi .v { font-size: clamp(1.3rem, 1.1vw + .5rem, 1.75rem); }
 .grade-inicio { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; margin-top: 1.25rem; align-items: start; }
 .cartao-largo { grid-column: 1 / -1; }
 .exec-status { display: flex; align-items: center; gap: .8rem; padding: .2rem 0 .9rem; }

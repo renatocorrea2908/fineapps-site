@@ -47,18 +47,19 @@
       <button data-aba="inicio" aria-selected="true"><span data-icone="inicio"></span><span class="nav-rot">Visão geral</span><kbd>1</kbd></button>
 
       <p class="nav-grupo">Decidir</p>
-      <button data-aba="aprov"><span data-icone="aprovar"></span><span class="nav-rot">Aprovações</span><span class="pill" id="pill-aprov" hidden></span><kbd>2</kbd></button>
-      <button data-aba="avisos"><span data-icone="sino"></span><span class="nav-rot">Avisos</span><span class="pill" id="pill-avisos" hidden></span><kbd>3</kbd></button>
+      <button data-aba="aprov" title="Pode ir? — itens que não começam sem a sua alçada"><span data-icone="aprovar"></span><span class="nav-rot">Aprovações</span><span class="pill" id="pill-aprov" hidden></span><kbd>2</kbd></button>
+      <button data-aba="aceite" title="Ficou bom? — entregas que só fecham com o seu aceite"><span data-icone="aceite"></span><span class="nav-rot">Aceitações</span><span class="pill" id="pill-aceite" hidden></span><kbd>3</kbd></button>
+      <button data-aba="avisos" title="Fique sabendo — nada aqui pede decisão"><span data-icone="sino"></span><span class="nav-rot">Avisos</span><span class="pill" id="pill-avisos" hidden></span><kbd>4</kbd></button>
 
       <p class="nav-grupo">Acompanhar</p>
-      <button data-aba="status"><span data-icone="lista"></span><span class="nav-rot">Itens</span><kbd>4</kbd></button>
-      <button data-aba="filas"><span data-icone="org"></span><span class="nav-rot">Organograma</span><kbd>5</kbd></button>
-      <button data-aba="paths"><span data-icone="rota"></span><span class="nav-rot">Caminhos</span><kbd>6</kbd></button>
+      <button data-aba="status"><span data-icone="lista"></span><span class="nav-rot">Itens</span><kbd>5</kbd></button>
+      <button data-aba="filas"><span data-icone="org"></span><span class="nav-rot">Organograma</span><kbd>6</kbd></button>
+      <button data-aba="paths"><span data-icone="rota"></span><span class="nav-rot">Caminhos</span><kbd>7</kbd></button>
 
       <p class="nav-grupo">Saúde e dinheiro</p>
-      <button data-aba="monitor"><span data-icone="pulso"></span><span class="nav-rot">Monitor</span><span class="pill" id="pill-monitor" hidden></span><kbd>7</kbd></button>
-      <button data-aba="custos"><span data-icone="dinheiro"></span><span class="nav-rot">Custos</span><span class="pill" id="pill-custos" hidden></span><kbd>8</kbd></button>
-      <button data-aba="report"><span data-icone="grafico"></span><span class="nav-rot">Report</span><kbd>9</kbd></button>
+      <button data-aba="monitor"><span data-icone="pulso"></span><span class="nav-rot">Monitor</span><span class="pill" id="pill-monitor" hidden></span><kbd>8</kbd></button>
+      <button data-aba="custos"><span data-icone="dinheiro"></span><span class="nav-rot">Custos</span><span class="pill" id="pill-custos" hidden></span><kbd>9</kbd></button>
+      <button data-aba="report"><span data-icone="grafico"></span><span class="nav-rot">Report</span><kbd>0</kbd></button>
     </nav>
 
     <div class="lateral-pe">
@@ -138,6 +139,13 @@
       <section class="aba" data-aba="aprov" hidden>
         <p class="sub-texto" id="sub-aprov"></p>
         <div class="lista acao" id="lista-aprov"></div>
+      </section>
+
+      <!-- ACEITAÇÕES — "ficou bom?": entregas que só fecham com o seu aceite -->
+      <section class="aba" data-aba="aceite" hidden>
+        <p class="sub-texto" id="sub-aceite"></p>
+        <div class="lista acao" id="lista-aceite"></div>
+        <div class="lista acao" id="lista-regua"></div>
       </section>
 
       <!-- AVISOS (D-14) — o que você precisa saber e não exige decisão sua -->
@@ -289,7 +297,7 @@
 
     </main>
 
-    <footer class="rodape">FineApps Sistemas Ltda. — área interna, não indexada. Os números vêm do banco; a tela não calcula nada sozinha. <span class="atalhos-dica">Atalhos: 1–9 páginas · N novo pedido · R atualizar · T tema · Esc fecha</span></footer>
+    <footer class="rodape">FineApps Sistemas Ltda. — área interna, não indexada. Os números vêm do banco; a tela não calcula nada sozinha. <span class="atalhos-dica">Atalhos: 1–0 páginas · N novo pedido · R atualizar · T tema · Esc fecha</span></footer>
   </div>
 
   <!-- O detalhe do item abre de lado, sem tirar você da lista -->

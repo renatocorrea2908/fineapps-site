@@ -19,7 +19,7 @@ const CHAVE_SESSAO = 'fineapps.os.sessao';
 let SESSAO = null;
 let RETRATO = null;
 let RELOGIO = null;
-const PAGINAS = ['inicio', 'aprov', 'avisos', 'status', 'filas', 'paths', 'monitor', 'custos', 'report', 'pedido'];
+const PAGINAS = ['inicio', 'aprov', 'aceite', 'avisos', 'status', 'filas', 'paths', 'monitor', 'custos', 'report', 'pedido'];
 let ABA = PAGINAS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inicio';
 let GAVETA = null;              // id do item aberto na gaveta de detalhe
 const F = {};                   // filtro cruzado: empresa, produto, fila, estado, natureza, quem, tipo, prioridade, pendente, caminho
@@ -41,6 +41,7 @@ const circ = (cx, cy, r) => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${
 const ICONES = {
   inicio: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
   aprovar: 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+  aceite: 'M21 8v13H3V8M1 3h22v5H1zM10 12h4',
   sino: 'M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
   lista: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01',
   org: 'M9 3h6v5H9zM3 16h6v5H3zM15 16h6v5h-6zM12 8v4M6 16v-2.5h12V16',
@@ -253,7 +254,13 @@ $('limpar').addEventListener('click', limpar);
 $('f-empresa').addEventListener('change', (e) => { if (e.target.value) F.empresa = e.target.value; else delete F.empresa; delete F.produto; render(); });
 $('f-produto').addEventListener('change', (e) => { if (e.target.value) F.produto = e.target.value; else delete F.produto; render(); });
 
-const pendente = (i) => i.aguarda_alcada || i.entrega_aberta || i.estado === 'decision_required';
+/* ⚠ (26/09) "O que espera por VOCÊ" é o que o banco pôs na sua caixa
+   (`inbox`, de `pendencias_do_ceo`) — e mais nada. A tela decidia sozinha
+   (alçada OU entrega aberta OU decisão) e chamava de "aguarda o seu aceite"
+   toda entrega técnica que a régua (7b) ou o CTO decidem: eram 12 "para você"
+   na caixa do CEO quando a caixa tinha 5. */
+let NA_CAIXA = new Map();        // id → classe, de RETRATO.inbox
+const pendente = (i) => NA_CAIXA.has(i.id);
 const aberto = (i) => i.estado !== 'done' && i.estado !== 'cancelled';
 const bate = (f, v) => (Array.isArray(f) ? f.includes(v) : f === v);
 
@@ -341,7 +348,8 @@ $('p-empresa').addEventListener('change', montarProdutosDoPedido);
    (#aprov), então o refresh volta onde você estava e o "voltar" funciona. */
 const TITULOS = {
   inicio: ['Visão geral', 'O que precisa de você, o que está andando e quanto custa — num olhar'],
-  aprov: ['Aprovações', 'Itens que não andam até você decidir'],
+  aprov: ['Aprovações', 'Pode ir? — itens que não começam sem a sua alçada'],
+  aceite: ['Aceitações', 'Ficou bom? — entregas que só fecham com o seu aceite'],
   avisos: ['Avisos', 'O que você precisa saber e não exige decisão sua'],
   status: ['Itens', 'Tudo o que está em aberto, por situação'],
   filas: ['Organograma', 'Quem carrega o quê, ao vivo'],
@@ -372,14 +380,13 @@ $('abrir-menu').addEventListener('click', abrirMenu);
 $('fechar-menu').addEventListener('click', fecharMenu);
 $('veu').addEventListener('click', fecharMenu);
 
-/* ── atalhos: 1–9 páginas, N novo pedido, R atualizar, T tema, Esc fecha ── */
+/* ── atalhos: 1–9 e 0 páginas, N novo pedido, R atualizar, T tema, Esc fecha ── */
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const alvo = e.target; const digitando = alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
   if (e.key === 'Escape') { if (GAVETA) fecharGaveta(); else fecharMenu(); if (digitando) alvo.blur(); return; }
   if (digitando || $('app').hidden) return;
-  const n = Number(e.key);
-  if (n >= 1 && n <= 9) { irPara(PAGINAS[n - 1]); e.preventDefault(); return; }
+  if (/^[0-9]$/.test(e.key)) { const n = Number(e.key); irPara(PAGINAS[n === 0 ? 9 : n - 1]); e.preventDefault(); return; }
   const k = e.key.toLowerCase();
   if (k === 'n') { irPara('pedido'); setTimeout(() => $('p-titulo').focus(), 50); e.preventDefault(); }
   else if (k === 'r') { atualizarAgora(); e.preventDefault(); }
@@ -388,7 +395,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ── vocabulário ──────────────────────────────────────────────────────────── */
 const ESTADOS = [
-  ['ready', 'Abertos, na fila'], ['in_progress', 'Em andamento'], ['validation', 'Entregues — aguardam aceite'],
+  ['ready', 'Abertos, na fila'], ['in_progress', 'Em andamento'], ['validation', 'Entregues — em aceite'],
   ['decision_required', 'Parados — precisam de você'], ['blocked', 'Bloqueados'], ['failed', 'Falharam'],
   ['done', 'Concluídos'], ['cancelled', 'Cancelados'],
 ];
@@ -405,7 +412,10 @@ function situacao(i) {
   if (i.estado === 'ready' && i.tentativas) return `na fila — pronto para a próxima tentativa · ${tentativasTexto(i)}`;
   if (i.estado === 'ready') return 'na fila — o executor pega no próximo despacho';
   if (i.estado === 'in_progress') return `em execução por ${i.executor || '—'} desde ${hhmm(i.desde)}`;
-  if (i.estado === 'validation') return i.entrega_aberta ? 'entregue — aguarda o seu aceite' : 'aceita — o executor está concluindo';
+  if (i.estado === 'validation') {
+    if (!i.entrega_aberta) return 'aceita — o executor está concluindo';
+    return NA_CAIXA.get(i.id) === 'entrega_aguarda_aceite' ? 'entregue — aguarda o SEU aceite' : 'entregue — o aceite é da régua (CI/CTO), não seu';
+  }
   if (i.estado === 'decision_required') return 'parado — precisa de você';
   if (i.estado === 'done') return `concluído em ${quando(i.concluido)}${i.tem_prova ? ' · com prova' : ' · SEM prova'}`;
   return rotuloEstado(i.estado) || i.estado;
@@ -416,7 +426,8 @@ function situacao(i) {
    nada. Agora a cor responde "isto anda sozinho ou depende de mim?". */
 function tomDoItem(i) {
   if (i.estado === 'decision_required') return 'parado';
-  if (i.aguarda_alcada || i.entrega_aberta) return 'espera';
+  if (NA_CAIXA.has(i.id)) return 'espera';
+  if (i.estado === 'validation' && i.entrega_aberta) return 'anda';
   if (i.estado === 'in_progress') return 'anda';
   if (i.estado === 'done') return 'ok';
   if (i.estado === 'cancelled') return '';
@@ -516,21 +527,32 @@ function listar(alvo, lista, opts) {
 /* ── ABA CC › Aprovações ──────────────────────────────────────────────────── */
 const ROTULO_CLASSE = { aguarda_alcada: 'aguarda a sua alçada', deliberacao_escalada: 'deliberação escalada a você',
                         entrega_aguarda_aceite: 'entrega pronta — aguarda o seu aceite', travado: 'travado — estourou o limite' };
-function desenharAprov() {
+/* ⚠ (26/09) DUAS PERGUNTAS, DUAS PÁGINAS. "Pode ir?" (Aprovações: alçada,
+   deliberação escalada, travado) e "Ficou bom?" (Aceitações: a entrega que só
+   fecha com o seu aceite) moravam na mesma lista — e o CEO lia tudo como
+   "está vindo para o meu aceite". A caixa é a mesma do banco; a tela só separa. */
+const eAceite = (p) => p.classe === 'entrega_aguarda_aceite';
+function desenharAprov() { desenharCaixa('aprov'); desenharCaixa('aceite'); }
+function desenharCaixa(modo) {
+  const ehAceite = modo === 'aceite';
   const porId = new Map(todosItens().map((i) => [i.id, i]));
-  const lista = ((RETRATO.inbox && RETRATO.inbox.itens) || []).filter((p) => { const i = porId.get(p.id); return !i || passa(i); });
-  const total = (RETRATO.inbox && RETRATO.inbox.total) || 0;
-  $('pill-aprov').textContent = String(total);
-  $('pill-aprov').className = 'pill' + (total ? ' vermelho' : ''); $('pill-aprov').hidden = !total;
-  $('sub-aprov').textContent = lista.length === 0
-    ? (total ? 'Nada com os filtros atuais.' : 'Nada espera por você. A fila anda sozinha.')
-    : `${lista.length} item(ns) não andam até você decidir. Em ordem de quem espera há mais tempo.`;
-  const alvo = $('lista-aprov'); alvo.replaceChildren();
-  if (!lista.length) alvo.appendChild(vazioGrande('Aprovações limpas', total ? 'Nada com os filtros atuais.' : 'Nada espera por você. A fila anda sozinha.'));
-  for (const p of (lista.length ? lista : [])) {
+  const daPagina = ((RETRATO.inbox && RETRATO.inbox.itens) || []).filter((p) => eAceite(p) === ehAceite);
+  const lista = daPagina.filter((p) => { const i = porId.get(p.id); return !i || passa(i); });
+  const total = daPagina.length;
+  const pill = $('pill-' + modo);
+  pill.textContent = String(total); pill.hidden = !total;
+  pill.className = 'pill' + (total ? (ehAceite ? ' ambar' : ' vermelho') : '');
+  const limpo = ehAceite ? 'Nenhuma entrega espera o seu aceite. O que é técnico, a régua (CI) e o CTO aceitam sozinhos.' : 'Nada espera a sua alçada. A fila anda sozinha.';
+  $('sub-' + modo).textContent = lista.length === 0
+    ? (total ? 'Nada com os filtros atuais.' : limpo)
+    : ehAceite ? `${lista.length} entrega(s) prontas que só fecham com o seu aceite (ou recusa com motivo). As mais antigas primeiro.`
+               : `${lista.length} item(ns) não começam até você decidir. As mais antigas primeiro.`;
+  const alvo = $('lista-' + modo); alvo.replaceChildren();
+  if (!lista.length) alvo.appendChild(vazioGrande(ehAceite ? 'Aceitações limpas' : 'Aprovações limpas', total ? 'Nada com os filtros atuais.' : limpo));
+  for (const p of lista) {
     const i = porId.get(p.id);
     const cx = el('article', 'item ' + (Number(p.dias_esperando) >= 2 ? 'urgente' : 'espera'));
-    cx.id = 'aprov-' + p.id;
+    cx.id = 'caixa-' + p.id;
     if (i) { const cab = el('button', 'item-cab'); cab.title = 'Abrir o detalhe'; cab.appendChild(el('h4', null, p.titulo)); cab.addEventListener('click', () => abrirGaveta(i.id)); cx.appendChild(cab); }
     else cx.appendChild(el('h4', null, p.titulo));
     const m = el('div', 'meta');
@@ -587,10 +609,13 @@ function desenharAprov() {
     if (p.classe === 'deliberacao_escalada') cx.appendChild(el('p', 'porque', 'Deliberação escalada: a decisão é registrada pela Triagem com a sua palavra. Escreva a decisão num pedido novo ou fale com o executor.'));
     alvo.appendChild(cx);
   }
-  // Só para você saber: o que a régua (CI) aceitou nos últimos 7 dias — informação, não pendência (M397)
+  // Só para você saber: o que a régua (CI) aceitou nos últimos 7 dias — informação, não pendência (M397).
+  // Mora em Aceitações: é a outra metade da mesma pergunta ("ficou bom?"), respondida sem você.
+  if (!ehAceite) return;
   const regua = ((RETRATO.estrutura && RETRATO.estrutura.entregas_da_regua) || []).filter((e) => (!F.empresa || e.empresa === F.empresa) && (!F.produto || (e.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, e.fila)));
+  const alvoR = $('lista-regua'); alvoR.replaceChildren();
   if (regua.length) {
-    alvo.appendChild(el('h3', 'info-titulo', `Entregue pela régua nos últimos 7 dias — só para você saber (${regua.length})`));
+    alvoR.appendChild(el('h3', 'info-titulo', `Aceito pela régua nos últimos 7 dias, sem precisar de você — só para você saber (${regua.length})`));
     for (const e of regua) {
       const cx = el('article', 'item info');
       cx.appendChild(el('h4', null, e.titulo));
@@ -605,7 +630,7 @@ function desenharAprov() {
       const dirR = el('span', 'meta-dir'); dirR.appendChild(el('span', null, quando(e.aceita_em))); m.appendChild(dirR);
       cx.appendChild(m); subirDir(cx);
       if (/^https?:\/\//.test(e.referencia || '')) { const a = el('a', 'ligacao', 'Ver a entrega (PR)'); a.appendChild(icone('externo')); a.href = e.referencia; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
-      alvo.appendChild(cx);
+      alvoR.appendChild(cx);
     }
   }
 }
@@ -1246,18 +1271,22 @@ function desenharInicio() {
   esq.appendChild(el('h2', null, `${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}${nome ? ', ' + nome : ''}`));
   const res = el('p', 'resumo');
   const partes = [];
-  partes.push(inbox.total ? [`${inbox.total} decisão(ões)`, ' esperam por você'] : ['Nada', ' espera por você']);
+  const nAprov = (inbox.itens || []).filter((x) => !eAceite(x)).length; const nAceite = (inbox.itens || []).filter(eAceite).length;
+  partes.push(nAprov ? [`${nAprov} aprovação(ões)`, ' e '] : ['nenhuma aprovação', ' e ']);
+  partes.push(nAceite ? [`${nAceite} aceitação(ões)`, ' esperam por você'] : ['nenhuma aceitação', ' esperam por você']);
   partes.push(novos.length ? [`${novos.length} aviso(s)`, ' sem ciência'] : ['nenhum aviso', ' novo']);
   partes.push(exec.length ? [`${exec.length} em execução`, ' agora'] : ['executor', ' ocioso']);
-  partes.forEach(([b, t], n) => { if (n) res.appendChild(document.createTextNode(' · ')); res.append(el('b', null, b), document.createTextNode(t)); });
+  partes.forEach(([b, t], n) => { if (n > 1) res.appendChild(document.createTextNode(' · ')); res.append(el('b', null, b), document.createTextNode(t)); });
   esq.appendChild(res);
   sa.append(esq, el('p', 'dica', new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })));
 
   const k = $('kpis-inicio'); k.replaceChildren();
-  const maisAntiga = Math.max(0, ...(inbox.itens || []).map((x) => Number(x.dias_esperando) || 0));
-  kpi(k, 'Aprovações', num(inbox.total), inbox.total ? `a mais antiga ${esperaTexto(maisAntiga)}` : 'nada espera por você', inbox.total ? (maisAntiga >= 2 ? 'atencao' : 'alerta') : 'ok', () => irPara('aprov'), false, 'aprovar');
+  const aprovs = (inbox.itens || []).filter((x) => !eAceite(x)); const aceites = (inbox.itens || []).filter(eAceite);
+  const antiga = (l) => Math.max(0, ...l.map((x) => Number(x.dias_esperando) || 0));
+  kpi(k, 'Aprovações', num(aprovs.length), aprovs.length ? `pode ir? · a mais antiga ${esperaTexto(antiga(aprovs))}` : 'nada espera a sua alçada', aprovs.length ? (antiga(aprovs) >= 2 ? 'atencao' : 'alerta') : 'ok', () => irPara('aprov'), false, 'aprovar');
+  kpi(k, 'Aceitações', num(aceites.length), aceites.length ? `ficou bom? · a mais antiga ${esperaTexto(antiga(aceites))}` : 'nenhuma entrega espera você', aceites.length ? (antiga(aceites) >= 2 ? 'atencao' : 'alerta') : 'ok', () => irPara('aceite'), false, 'aceite');
   kpi(k, 'Avisos sem ciência', num(novos.length), novos.length ? 'nada aqui pede decisão' : 'fila limpa', novos.length ? 'alerta' : 'ok', () => irPara('avisos'), false, 'sino');
-  kpi(k, 'Em execução', num(exec.length), exec.length ? `${num(fila.length)} esperando a vez` : fila.length ? `ocioso · ${num(fila.length)} na fila` : 'executor ocioso', exec.length ? 'ok' : '', () => { F.estado = 'in_progress'; irPara('status'); render(); }, false, 'raio');
+  // (26/09) "Em execução" saiu dos números: o cartão Executor agora, logo abaixo, diz o mesmo com o item e a hora.
   kpi(k, 'Réguas verdes', `${num(vig.total - vig.vermelhos.length)}/${num(vig.total)}`, vig.vermelhos.length ? 'vermelha: ' + vig.vermelhos.join(', ') : 'todas verdes', vig.vermelhos.length ? 'atencao' : 'ok', () => irPara('monitor'), false, 'escudo');
   const fx = cons.faixa === 'estourado' ? 'atencao' : (cons.faixa === 'aviso_2' || cons.faixa === 'aviso_3') ? 'alerta' : cons.percentual == null ? '' : 'ok';
   const unidade = cons.unidade === 'USD' ? (n) => 'US$ ' + Number(n).toFixed(2).replace('.', ',') : (n) => num(n) + ' min';
@@ -1276,7 +1305,7 @@ function desenharInicio() {
     ia.appendChild(lin(x.titulo,
       [el('span', 'sit ' + (Number(x.dias_esperando) >= 2 ? 'parado' : 'espera'), escalado ? 'escalado pelo CTO' : (ROTULO_CLASSE[x.classe] || x.classe)), i && i.produto, i && i.fila],
       esperaTexto(x.dias_esperando), Number(x.custo_ja_gasto) > 0 ? moeda(x.custo_ja_gasto) : null,
-      () => { irPara('aprov'); setTimeout(() => { const c = $('aprov-' + x.id); if (c) { c.scrollIntoView({ block: 'center', behavior: 'smooth' }); const inp = c.querySelector('input'); if (inp) inp.focus({ preventScroll: true }); } }, 60); },
+      () => { irPara(eAceite(x) ? 'aceite' : 'aprov'); setTimeout(() => { const c = $('caixa-' + x.id); if (c) { c.scrollIntoView({ block: 'center', behavior: 'smooth' }); const inp = c.querySelector('input'); if (inp) inp.focus({ preventScroll: true }); } }, 60); },
       Number(x.dias_esperando) >= 2 ? 'quente' : null));
   }
 
@@ -1332,6 +1361,7 @@ function desenharInicio() {
 /* ── render geral ─────────────────────────────────────────────────────────── */
 function render() {
   if (!RETRATO) return;
+  NA_CAIXA = new Map(((RETRATO.inbox && RETRATO.inbox.itens) || []).map((p) => [p.id, p.classe]));
   desenharChips(); montarSeletores();
   desenharAprov(); desenharStatus(); desenharOrg(); desenharPaths();
   desenharPedido(); desenharAvisos(); desenharMonitor(); desenharCustos(); desenharReport();
