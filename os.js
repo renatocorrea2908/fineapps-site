@@ -244,7 +244,9 @@ function esqueleto() {
 
 /* ── filtro cruzado ───────────────────────────────────────────────────────── */
 const ROTULO_F = { empresa: 'Empresa', produto: 'Produto', fila: 'Fila', estado: 'Status', natureza: 'Natureza', quem: 'Quem abriu',
-                   tipo: 'Tipo', prioridade: 'Prioridade', pendente: 'Parado em você', caminho: 'Caminho', squad: 'Squad', executor: 'Executor' };
+                   tipo: 'Tipo', prioridade: 'Prioridade', pendente: 'Parado em você', caminho: 'Caminho', squad: 'Squad', executor: 'Executor', qualidade: 'Qualidade' };
+// (27/09, CEO) o card de qualidade do Monitor leva a Itens filtrado pelos itens que ELE contou (a porta devolve os ids)
+let QUAL_SEL = null;
 function alternar(chave, valor) {
   const atual = F[chave];
   const mesmo = Array.isArray(valor) ? JSON.stringify(atual) === JSON.stringify(valor) : atual === valor;
@@ -278,6 +280,7 @@ function passa(i) {
   if (F.squad && i.squad !== F.squad) return false;
   if (F.executor && i.executor !== F.executor) return false;
   if (F.pendente && !pendente(i)) return false;
+  if (F.qualidade && !(QUAL_SEL && QUAL_SEL.has(i.id))) return false;
   if (F.caminho) {
     const c = i.caminho || {};
     if (F.caminho === 'limpo' && !c.caminho_limpo) return false;
@@ -732,11 +735,12 @@ function desenharStatus() {
     b.addEventListener('click', () => alternar('estado', k));
     bd.appendChild(b);
   }
-  const lista = itens().filter((i) => F.estado ? true : aberto(i)).sort((a, b) => new Date(b.atualizado || b.criado) - new Date(a.atualizado || a.criado));
+  // (27/09) o filtro de qualidade é sobre itens ENCERRADOS: com ele, os fechados aparecem sem precisar escolher a situação
+  const lista = itens().filter((i) => F.estado || F.qualidade ? true : aberto(i)).sort((a, b) => new Date(b.atualizado || b.criado) - new Date(a.atualizado || a.criado));
   // (o texto abaixo continua dizendo onde clicar: agora o título abre o detalhe ao lado)
   // ⚠ A dica é texto de seção, não item: numa grade ela roubava uma célula e
   //    abria um buraco no canto. Atravessa as colunas.
-  $('lista-status').replaceChildren(el('p', 'dica larga', F.estado ? `${lista.length} item(ns) em "${rotuloEstado(F.estado)}" · clique no título para abrir o detalhe` : `${lista.length} em aberto · clique numa situação para filtrar · clique no título para abrir o detalhe`));
+  $('lista-status').replaceChildren(el('p', 'dica larga', F.qualidade && !F.estado ? `${lista.length} item(ns) — ${F.qualidade} · clique no título para abrir o detalhe` : F.estado ? `${lista.length} item(ns) em "${rotuloEstado(F.estado)}" · clique no título para abrir o detalhe` : `${lista.length} em aberto · clique numa situação para filtrar · clique no título para abrir o detalhe`));
   for (const i of lista) $('lista-status').appendChild(cartaoItem(i));
   if (!lista.length) $('lista-status').appendChild(el('p', 'vazio', 'Nada aqui com os filtros atuais.'));
 }
@@ -1097,8 +1101,15 @@ function desenharQualidade() {
   if (!jq) { alvo.appendChild(el('p', 'dica', 'carregando…')); return; }
   if (jq.erro || !jq.dados || jq.dados.encerrados == null) { alvo.appendChild(el('p', 'dica', 'A medida de qualidade chega com a M549.')); return; }
   const q = jq.dados; const pct = (v) => (v == null ? '—' : String(v).replace('.', ',') + '%');
-  kpi(alvo, 'Entregues sem falha', pct(q.pct_entregues_sem_falha), `${num(q.concluidos_sem_falha)} de ${num(q.encerrados)} encerrados · ${num(q.concluidos_com_falha)} concluídos depois de falhar`, q.pct_entregues_sem_falha == null ? '' : q.pct_entregues_sem_falha >= 70 ? 'ok' : 'atencao');
-  kpi(alvo, 'Cancelados por falha', pct(q.pct_cancelados_por_falha), `${num(q.cancelados_por_falha)} de ${num(q.encerrados)} encerrados · ${num(q.divididos)} divididos (fora da conta)`, q.pct_cancelados_por_falha > 10 ? 'atencao' : 'ok');
+  // (27/09, CEO) "ao clicar nesses cards, leva para Itens já filtrado" — pelos ids que a porta contou (M557)
+  const irQual = (ids, rot) => Array.isArray(ids) ? () => {
+    for (const k of Object.keys(F)) if (k !== 'empresa' && k !== 'produto') delete F[k];
+    QUAL_SEL = new Set(ids); F.qualidade = `${rot} · ${rotuloJanela(JANELA.qualidade)}`;
+    irPara('status'); render();
+  } : null;
+  const dicaClique = (ids) => Array.isArray(ids) ? ' · clique para ver os itens' : '';
+  kpi(alvo, 'Entregues sem falha', pct(q.pct_entregues_sem_falha), `${num(q.concluidos_sem_falha)} de ${num(q.encerrados)} encerrados · ${num(q.concluidos_com_falha)} concluídos depois de falhar${dicaClique(q.ids_sem_falha)}`, q.pct_entregues_sem_falha == null ? '' : q.pct_entregues_sem_falha >= 70 ? 'ok' : 'atencao', irQual(q.ids_sem_falha, 'entregues sem falha'));
+  kpi(alvo, 'Cancelados por falha', pct(q.pct_cancelados_por_falha), `${num(q.cancelados_por_falha)} de ${num(q.encerrados)} encerrados · ${num(q.divididos)} divididos (fora da conta)${dicaClique(q.ids_cancelados_por_falha)}`, q.pct_cancelados_por_falha > 10 ? 'atencao' : 'ok', irQual(q.ids_cancelados_por_falha, 'cancelados por falha'));
   kpi(alvo, 'Rodadas por item concluído', q.rodadas_por_concluido == null ? '—' : String(q.rodadas_por_concluido).replace('.', ','), 'quantas vezes o executor pegou o item até concluir');
   $('sub-qualidade').textContent = `itens encerrados em ${rotuloJanela(JANELA.qualidade)} · falha = rodada que voltou ou entrega recusada`;
 }
@@ -1155,11 +1166,7 @@ function desenharMonitor() {
     { rot: 'Pista', valor: pista },
     { rot: 'Situação', valor: situacao, celula: (d) => el('span', 'sit ' + (d.enviado ? 'ok' : 'parado'), situacao(d)) },
   ], p.despachos || [], { barra: 'barra-despachos', unidade: 'despacho(s)' });
-  const dv = RETRATO.desvios || {};
-  const pares = Object.entries(dv.por_desvio || {}).map(([k, v]) => [k, num(v)]);
-  pares.push(['passos no caminho / total', `${num(dv.passos && dv.passos.no_caminho)} / ${num(dv.passos && dv.passos.total)}`]);
-  pares.push(['itens com desvio', num(dv.itens && dv.itens.com_desvio)]);
-  linhas($('mon-desvios'), pares);
+  desenharDesvios();
 }
 
 /* (M466, 26/09) As rampas têm NOME de gente, e as duas regras de aceite são
@@ -1515,6 +1522,171 @@ function dadosDaJanela(fn, chaveJ, aoChegar) {
   return null;
 }
 
+/* ── DESVIOS (M558, 27/09, CEO) ───────────────────────────────────────────────
+   "coloca o percentual de cada item na linha e um botão de Análise que gera um report em md
+   com a análise das causas raízes. E os 7 dias devem ser configuráveis: Total, último ano,
+   último semestre, tri, mês, semana". O período muda a janela da porta; o % é do total de
+   desvios da janela; a Análise é pedida ao banco, que junta o dossiê e acorda o CTO. */
+const PERIODOS_DESVIO = [['semana', 'Semana', 7], ['mes', 'Mês', 30], ['tri', 'Trimestre', 91], ['semestre', 'Semestre', 182], ['ano', 'Ano', 365], ['total', 'Total', null]];
+let PERIODO_DESVIO = 'semana';
+let VIGIA_ANALISE = null;
+function janelaDoPeriodo(k) {
+  const p = PERIODOS_DESVIO.find((x) => x[0] === k) || PERIODOS_DESVIO[0];
+  const ate = new Date(); const de = p[2] == null ? new Date('2020-01-01T00:00:00Z') : new Date(ate.getTime() - p[2] * 864e5);
+  return { de, ate };
+}
+const pctTxt = (v) => (v == null ? '—' : String(v).replace('.', ',') + '%');
+const ESTADO_ANALISE = { pedida: 'na fila do CTO', em_andamento: 'o CTO está escrevendo', pronta: 'pronta', falhou: 'falhou' };
+function desenharDesvios() {
+  const alvo = $('mon-desvios'); if (!alvo) return;
+  const per = $('desvios-periodo'); per.replaceChildren();
+  for (const [k, rot] of PERIODOS_DESVIO) {
+    const b = el('button', 'badge', rot); b.type = 'button'; b.setAttribute('aria-pressed', String(PERIODO_DESVIO === k));
+    b.addEventListener('click', () => { PERIODO_DESVIO = k; JANELA.desvios = janelaDoPeriodo(k); desenharDesvios(); });
+    per.appendChild(b);
+  }
+  if (!JANELA.desvios) JANELA.desvios = janelaDoPeriodo(PERIODO_DESVIO);
+  const jd = dadosDaJanela('company_os_meus_desvios', 'desvios', () => desenharDesvios());
+  const rotP = (PERIODOS_DESVIO.find((x) => x[0] === PERIODO_DESVIO) || [])[1] || '';
+  // antes da M558 (ou enquanto a porta não responde) vale o retrato de 7 dias, sem botão
+  if (!jd || jd.erro || !jd.dados || !Array.isArray(jd.dados.lista)) {
+    const dv = RETRATO.desvios || {};
+    const tot = Object.values(dv.por_desvio || {}).reduce((a, b) => a + Number(b || 0), 0);
+    const pares = Object.entries(dv.por_desvio || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, `${num(v)} · ${tot ? pctTxt(Math.round(1000 * v / tot) / 10) : '—'}`]);
+    pares.push(['passos no caminho / total', `${num(dv.passos && dv.passos.no_caminho)} / ${num(dv.passos && dv.passos.total)}`]);
+    pares.push(['itens com desvio', num(dv.itens && dv.itens.com_desvio)]);
+    linhas(alvo, pares);
+    $('sub-desvios').textContent = !jd ? 'carregando o período…' : 'últimos 7 dias · o período e a Análise chegam com a M558';
+    $('mon-analises').replaceChildren();
+    return;
+  }
+  const d = jd.dados;
+  $('sub-desvios').textContent = `${rotP} · ${num(d.passos && d.passos.desvios)} desvio(s) em ${num(d.passos && d.passos.total)} passos · % = parte do total de desvios`;
+  alvo.replaceChildren();
+  for (const x of d.lista) {
+    const l = el('div', 'linha desvio-linha');
+    const nome = el('span', null, x.rotulo); if (!x.conhecido) nome.title = 'passo que o caminho não prevê e que ainda não tem nome';
+    const val = el('span', 'd', `${num(x.n)} · ${pctTxt(x.pct_dos_desvios)}`); val.title = `${num(x.itens)} item(ns) · ${pctTxt(x.pct_dos_passos)} de todos os passos`;
+    const b = el('button', 'btn-mini', 'Análise'); b.type = 'button'; b.title = 'Pedir ao CTO um relatório de causa raiz deste desvio, no período escolhido';
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try {
+        const r = await rpc('company_os_pedir_analise_desvio', { p_de_loc: x.de, p_para_loc: x.para, p_de: JANELA.desvios.de.toISOString(), p_ate: JANELA.desvios.ate.toISOString() });
+        toast(r && r.repetido ? 'Esta análise já está com o CTO — o relatório aparece aqui embaixo.' : 'Análise pedida. O CTO escreve o relatório em alguns minutos; ele aparece aqui embaixo.');
+        recarregarDesvios();
+      } catch (e) { toast(String(e.message || e), false); b.disabled = false; }
+    });
+    l.append(nome, val, b); alvo.appendChild(l);
+  }
+  if (!d.lista.length) alvo.appendChild(el('p', 'vazio', 'Nenhum desvio no período.'));
+  const resumo = el('div', 'linha total'); resumo.append(el('span', null, 'passos no caminho / total'), el('span', 'd', `${num(d.passos && d.passos.no_caminho)} / ${num(d.passos && d.passos.total)} · ${pctTxt(d.pct_passos_no_caminho)}`)); alvo.appendChild(resumo);
+  const res2 = el('div', 'linha total'); res2.append(el('span', null, 'itens com desvio'), el('span', 'd', `${num(d.itens && d.itens.com_desvio)} de ${num(d.itens && d.itens.que_se_mexeram)} · ${pctTxt(d.pct_itens_com_desvio)}`)); alvo.appendChild(res2);
+  desenharAnalises(d.analises || []);
+}
+function recarregarDesvios() {
+  for (const k of Object.keys(DADOS_JANELA)) if (k.startsWith('company_os_meus_desvios|')) delete DADOS_JANELA[k];
+  desenharDesvios();
+}
+function desenharAnalises(lista) {
+  const a = $('mon-analises'); a.replaceChildren();
+  if (!lista.length) return;
+  a.appendChild(el('h3', null, 'Análises de causa raiz'));
+  for (const x of lista.slice(0, 12)) {
+    const l = el('div', 'linha analise ' + x.estado);
+    const t = el('span', null, `${x.rotulo} · ${dia(x.periodo_de)} → ${dia(x.periodo_ate)}`);
+    const est = el('span', 'd', x.estado === 'falhou' && x.erro ? `falhou: ${x.erro}` : `${ESTADO_ANALISE[x.estado] || x.estado} · ${quando(x.pronto_em || x.pedido_em)}`);
+    l.append(t, est);
+    if (x.estado === 'pronta') { const b = el('button', 'btn-mini', 'Ler'); b.type = 'button'; b.addEventListener('click', () => abrirAnalise(x.id)); l.appendChild(b); }
+    a.appendChild(l);
+  }
+  // enquanto houver análise em curso, a lista se atualiza sozinha (a cada 30 s, só com o Monitor aberto)
+  const emCurso = lista.some((x) => x.estado === 'pedida' || x.estado === 'em_andamento');
+  if (emCurso && !VIGIA_ANALISE) VIGIA_ANALISE = setTimeout(() => { VIGIA_ANALISE = null; if (ABA === 'monitor') recarregarDesvios(); }, 30000);
+}
+// markdown → DOM, sem innerHTML: cabeçalhos, listas, negrito, código e parágrafos
+function mdParaDom(md) {
+  const raiz = el('div', 'md');
+  const inline = (alvo, txt) => {
+    for (const parte of String(txt).split(/(\*\*[^*]+\*\*|`[^`]+`)/g)) {
+      if (!parte) continue;
+      if (/^\*\*[^*]+\*\*$/.test(parte)) alvo.appendChild(el('strong', null, parte.slice(2, -2)));
+      else if (/^`[^`]+`$/.test(parte)) alvo.appendChild(el('code', null, parte.slice(1, -1)));
+      else alvo.appendChild(document.createTextNode(parte));
+    }
+  };
+  let lista = null; let par = null; let bloco = null;
+  const fecha = () => { lista = null; par = null; };
+  for (const linha of String(md || '').split('\n')) {
+    if (/^```/.test(linha)) { if (bloco) { bloco = null; } else { fecha(); bloco = el('pre'); raiz.appendChild(bloco); } continue; }
+    if (bloco) { bloco.appendChild(document.createTextNode(linha + '\n')); continue; }
+    const h = linha.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { fecha(); const e = el('h' + Math.min(6, h[1].length + 1)); inline(e, h[2]); raiz.appendChild(e); continue; }
+    const li = linha.match(/^\s*(?:[-*]|\d+[.)])\s+(.*)$/);
+    if (li) { par = null; if (!lista) { lista = el(/^\s*\d/.test(linha) ? 'ol' : 'ul'); raiz.appendChild(lista); } const e = el('li'); inline(e, li[1]); lista.appendChild(e); continue; }
+    if (!linha.trim()) { fecha(); continue; }
+    lista = null;
+    if (!par) { par = el('p'); raiz.appendChild(par); } else par.appendChild(document.createTextNode(' '));
+    inline(par, linha.trim());
+  }
+  return raiz;
+}
+async function abrirAnalise(id) {
+  let a;
+  try { a = await rpc('company_os_minha_analise_desvio', { p_id: id }); } catch (e) { toast(String(e.message || e), false); return; }
+  if (!a || !a.relatorio_md) { toast('O relatório ainda não está pronto.', false); return; }
+  const fundo = el('div', 'leitor-fundo'); fundo.setAttribute('role', 'dialog'); fundo.setAttribute('aria-modal', 'true'); fundo.setAttribute('aria-label', 'Análise de causa raiz');
+  const caixa = el('div', 'leitor');
+  const cab = el('div', 'leitor-cab');
+  cab.appendChild(el('span', 'leitor-tit', `${a.rotulo} · ${dia(a.periodo_de)} → ${dia(a.periodo_ate)}`));
+  const baixar = el('button', 'btn sec', 'Baixar .md'); baixar.type = 'button';
+  baixar.addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([a.relatorio_md], { type: 'text/markdown;charset=utf-8' }));
+    const l = document.createElement('a'); l.href = url; l.download = `analise-${String(a.rotulo).toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${String(a.pronto_em || '').slice(0, 10)}.md`;
+    document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  });
+  const fechar = el('button', 'btn sec', 'Fechar'); fechar.type = 'button';
+  const sair = () => { fundo.remove(); document.removeEventListener('keydown', esc); };
+  const esc = (e) => { if (e.key === 'Escape') sair(); };
+  fechar.addEventListener('click', sair); fundo.addEventListener('click', (e) => { if (e.target === fundo) sair(); });
+  document.addEventListener('keydown', esc);
+  cab.append(baixar, fechar);
+  caixa.append(cab, mdParaDom(a.relatorio_md));
+  fundo.appendChild(caixa); document.body.appendChild(fundo); fechar.focus();
+}
+
+/* ── COMPOSIÇÃO DOS MINUTOS DO GITHUB (M557, 27/09, CEO) ──────────────────────
+   "mantém o de cima. em baixo, quebra em mais cards: CI, agentes... e o que mais precisar para
+   compor o número de cima". O de cima é a fatura; aqui, o mesmo total medido run a run. */
+const NOME_WORKFLOW = {
+  'test-plano.yml': 'Plano de Testes', 'oficina-os.yml': 'Executor', 'council-os.yml': 'Council (Triagem e CTO)',
+  'oficina-ci.yml': 'Aceite do CI', 'oficina-entrega.yml': 'Merge', 'portao-squad.yml': 'Portão da squad',
+  'scan-segredos.yml': 'Scan de segredos', 'vigia-diario.yml': 'Vigia diário', 'backup-diario.yml': 'Backup',
+  'serie-diaria.yml': 'Série diária', 'faxina-reservas.yml': 'Faxina de reservas', 'medir-actions.yml': 'Medidor de minutos', 'ping.yml': 'Ping',
+};
+function desenharComposicao(daJanela) {
+  const alvo = $('kpis-composicao'); if (!alvo) return;
+  const jg = dadosDaJanela('company_os_meus_minutos_github', 'custos', () => desenharCustos());
+  alvo.replaceChildren(); const nota = $('nota-composicao'); nota.textContent = '';
+  if (!jg) { alvo.appendChild(el('p', 'dica', 'carregando…')); return; }
+  const g = jg.dados || {};
+  if (jg.erro || !Array.isArray(g.categorias)) { alvo.appendChild(el('p', 'dica', 'A quebra por origem chega com a M557 — o robô mede os runs a cada 2 h.')); return; }
+  if (!g.coletado_ate) { alvo.appendChild(el('p', 'dica', 'O medidor ainda não gravou nenhum run. Ele roda a cada 2 h; o primeiro resultado aparece aqui.')); return; }
+  $('sub-composicao').textContent = `${daJanela ? rotuloJanela(JANELA.custos) : 'mês corrente'} · ${num(g.runs)} runs · medido até ${quando(g.coletado_ate)}`;
+  kpi(alvo, 'Total medido run a run', `${num(g.minutos)} min`, `${num(g.minutos_pagos)} min pagos (além da franquia) = ${moeda(g.brl)}`, 'total');
+  for (const c of g.categorias) {
+    const k = kpi(alvo, c.rotulo, `${num(c.minutos)} min`, `${pctTxt(c.pct)} · ${moeda(c.brl)} · ${num(c.runs)} run${Number(c.runs) === 1 ? '' : 's'}`, c.categoria === 'ci' && Number(c.pct) > 50 ? 'atencao' : '');
+    const lw = el('div', 's lista-fixos');
+    for (const w of (c.workflows || []).slice(0, 6)) lw.appendChild(el('span', null, `${NOME_WORKFLOW[w.workflow] || w.nome || w.workflow}${c.categoria === 'outros_repos' ? ' (' + w.repo + ')' : ''}: ${num(w.minutos)} min · ${num(w.runs)} run${Number(w.runs) === 1 ? '' : 's'}`));
+    k.appendChild(lw);
+  }
+  // a fatura (o card de cima) × a soma run a run — só faz sentido comparar no mês corrente
+  const mc = (RETRATO.painel && RETRATO.painel.consumo) || {};
+  if (!daJanela && mc.usado != null && mc.unidade !== 'USD') {
+    const dif = Number(mc.usado) ? Math.round(1000 * (Number(g.minutos) - Number(mc.usado)) / Number(mc.usado)) / 10 : null;
+    nota.textContent = `Fatura do GitHub no mês: ${num(mc.usado)} min · medido run a run: ${num(g.minutos)} min${dif == null ? '' : ` (${dif > 0 ? '+' : ''}${String(dif).replace('.', ',')}%)`}. A fatura fecha por dia e inclui outros repositórios; o run a run arredonda cada job ao minuto.`;
+  } else nota.textContent = g.regra || '';
+}
+
 /* ── ABA Custos ───────────────────────────────────────────────────────────── */
 function desenharCustos() {
   desenharMedidor($('medidor-consumo'));
@@ -1549,7 +1721,7 @@ function desenharCustos() {
   for (const f of (cu.fixos || [])) lf.appendChild(el('span', null, `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' = ' : ''}${moeda(f.valor_brl)}/mês${f.na_janela_brl != null ? ' · na janela ' + moeda(f.na_janela_brl) : ''}`));
   if (Number(cu.cambio)) lf.appendChild(el('span', 'cambio', `câmbio ${Number(cu.cambio).toFixed(2).replace('.', ',')}`));
   kf.appendChild(lf);
-  kpi(k, daJanela ? 'GitHub Actions na janela' : 'GitHub Actions no mês', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
+  kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
   kpi(k, daJanela ? 'Custo real na janela' : 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : daJanela ? rotJ : cu.provisorio ? 'fixos + excedente de Actions · provisório até o mês fechar' : 'mês fechado');
   // (27/09, CEO) o cartão abre, em fonte menor, o médio do Claude e do GitHub — minutos e dinheiro
   const km = kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo real ÷ ${num(itensC.length)} item(ns) trabalhados · ${rotJ}`);
@@ -1562,6 +1734,7 @@ function desenharCustos() {
     km.appendChild(lm);
   }
   kpi(k, 'Parado esperando você', moeda(c.gasto_parado_esperando_voce), 'consumo já feito em itens travados');
+  desenharComposicao(daJanela);
 
   // custo real por item
   $('sub-custeio').textContent = `${daJanela ? rotJ : cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ''}`;

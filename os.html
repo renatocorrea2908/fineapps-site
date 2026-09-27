@@ -259,8 +259,10 @@
               <div class="rampas" id="robos"></div>
             </div>
             <div class="cartao topo-espaco">
-              <div class="cartao-cab"><h2>Desvios nos últimos 7 dias</h2><span class="dica">contados em passos do caminho</span></div>
+              <div class="cartao-cab"><h2>Desvios</h2><span class="dica" id="sub-desvios">contados em passos do caminho</span></div>
+              <div class="chips periodo" id="desvios-periodo" role="group" aria-label="Período dos desvios"></div>
               <div class="linhas" id="mon-desvios"></div>
+              <div class="analises" id="mon-analises"></div>
             </div>
           </div>
         </div>
@@ -278,6 +280,12 @@
         <div id="medidor-consumo" class="faixa-topo"></div>
         <div class="janela" id="janela-custos"></div>
         <div class="kpis" id="kpis-custos"></div>
+        <!-- (27/09, CEO) o número da fatura, quebrado por origem: CI, agentes, robôs, vigias -->
+        <div class="cartao topo-espaco">
+          <div class="cartao-cab"><h2>De onde vêm os minutos do GitHub</h2><span class="dica" id="sub-composicao">run a run, por workflow</span></div>
+          <div class="kpis" id="kpis-composicao"></div>
+          <p class="dica" id="nota-composicao"></p>
+        </div>
         <div class="grade-custos topo-espaco">
           <div class="cartao">
             <div class="cartao-cab"><h2>Custo real por fila</h2><span class="dica">clique numa barra para filtrar</span></div>
