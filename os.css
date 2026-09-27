@@ -764,3 +764,13 @@ button.lin:hover { background: var(--sup-3); }
 
 /* (27/09, M551) o número do item */
 .codigo { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--tinta-3); margin-right: .4rem; font-size: .9em; white-space: nowrap; }
+
+/* (27/09) a marca AI Company OS — um logo para cada tema */
+.marca-logo { flex-direction: column; align-items: flex-start; gap: .3rem; }
+.marca-logo .logo-tema { display: block; height: 66px; width: auto; }
+.marca-grande.marca-logo { align-items: center; }
+.marca-grande.marca-logo .logo-tema { height: 110px; }
+.logo-escuro { display: none !important; }
+[data-theme="dark"] .logo-escuro { display: block !important; }
+[data-theme="dark"] .logo-claro { display: none !important; }
+.marca-sub { font-size: .72rem; font-weight: 500; color: var(--tinta-3); letter-spacing: .01em; white-space: nowrap; }
