@@ -450,7 +450,8 @@ function cartaoItem(i, opts = {}) {
   const tom = tomDoItem(i);
   const cx = el('article', 'item clicavel' + (tom === 'parado' ? ' urgente' : pendente(i) && aberto(i) ? ' espera' : '') + (GAVETA === i.id ? ' aberto' : ''));
   const cab = el('button', 'item-cab'); cab.setAttribute('aria-haspopup', 'dialog'); cab.title = 'Abrir o detalhe';
-  cab.appendChild(el('h4', null, i.titulo));
+  // (27/09, M551) o número do item vem antes do título — é por ele que se pergunta e se rastreia
+  const h4 = el('h4'); if (i.codigo) h4.appendChild(el('span', 'codigo', i.codigo)); h4.appendChild(document.createTextNode(i.titulo)); cab.appendChild(h4);
   const m = el('div', 'meta');
   // ⚠ A situação primeiro, e colorida: é ela que decide se você para neste
   //    cartão. Depois ONDE (empresa · produto · fila), um divisor, e O QUE
@@ -496,7 +497,7 @@ function desenharGaveta() {
   g.classList.toggle('aberta', !!i); g.setAttribute('aria-hidden', String(!i)); $('veu-gaveta').hidden = !i;
   const c = $('gaveta-corpo'); c.replaceChildren(); if (!i) return;
   c.appendChild(el('span', 'sit ' + tomDoItem(i), situacao(i)));
-  const h = el('h2', null, i.titulo); h.id = 'gaveta-titulo'; c.appendChild(h);
+  const h = el('h2'); if (i.codigo) h.appendChild(el('span', 'codigo', i.codigo)); h.appendChild(document.createTextNode(i.titulo)); h.id = 'gaveta-titulo'; c.appendChild(h);
   const ficha = el('dl', 'ficha');
   const par = (rot, valor, chave, filtro) => {
     if (valor == null || valor === '') return;
@@ -1226,7 +1227,8 @@ const RAMPAS_TEXTO = {
 };
 function desenharRampas() {
   const pr = $('painel-rampas'); if (!pr) return; pr.replaceChildren();
-  const rampas = (RETRATO.estrutura && RETRATO.estrutura.rampas) || [];
+  // (27/09, M554) o freio de gasto saiu por decisão do CEO — não há o que ligar
+  const rampas = ((RETRATO.estrutura && RETRATO.estrutura.rampas) || []).filter((r) => r.nome !== 'freio_automatico');
   if (!rampas.length) { pr.appendChild(el('p', 'dica', 'Nenhuma rampa declarada.')); return; }
   const fixaDe = (r) => !!(r.fixa ?? (RAMPAS_TEXTO[r.nome] || [])[2]);
   const ordenadas = rampas.slice().sort((a, b) => Number(fixaDe(b)) - Number(fixaDe(a)));
@@ -1429,7 +1431,10 @@ function esteira(alvo) {
    Uma medida só — o custo real do mês, a mesma régua dos itens — aberta por
    agente, squad, cliente, produto e fila. Por agente vem do banco (M473: cada
    rodada leva a sua fatia); os outros são recortes dos itens já rateados. */
-const NOME_AGENTE = { 'executor-actions': 'Executor (Oficina)', 'council-actions': 'Triagem (Council)', 'histórico': 'Histórico (antes da medição por rodada)' };
+const NOME_AGENTE = { 'executor-actions': 'Executor (Oficina)', 'council-actions': 'Council (antes da separação por papel, 27/09)', 'histórico': 'Histórico (antes da medição por rodada)',
+  // (27/09) cada papel grava a própria rodada
+  triagem: 'Triagem', 'triagem-divisao': 'Triagem — divisão', 'cto-decisao': 'CTO — decisão do time', 'cto-conferencia': 'CTO — conferência de entrega',
+  ficha: 'Ficha de decisão', 'cto-capacidade': 'CTO — relatório de capacidade', merge: 'Merge (conclusão)', 'aceite-ci': 'Aceite Técnico (CI)' };
 let MEDIA_POR = 'squad';
 function desenharMedias(cu, itensC, filtrado) {
   const alvo = $('medias-por'); if (!alvo) return;
@@ -1460,7 +1465,7 @@ function desenharMedias(cu, itensC, filtrado) {
   ], linhasM, { barra: 'barra-medias', unidade: 'grupo(s)' });
   const nota = $('medias-nota');
   nota.textContent = MEDIA_POR === 'agente'
-    ? (cu.por_agente ? `Por agente não segue os filtros de cima. A Triagem roda sem item e fica fora do rateio: ${num(cu.triagem && cu.triagem.rodadas)} rodadas no período.` : 'O custo por agente chega com a M473.')
+    ? (cu.por_agente ? `Por agente não segue os filtros de cima. Inclui as rodadas sem item (Triagem, CTO, ficha): ${num(cu.triagem && cu.triagem.rodadas)} no período. A separação por papel vale a partir de 27/09; antes, tudo era "Council".` : 'O custo por agente chega com a M473.')
     : `${MEDIA_POR === 'cliente' ? 'Cliente = a empresa dona do item. ' : ''}${filtrado ? 'Segue os filtros de cima.' : ''}`;
 }
 
@@ -1564,7 +1569,7 @@ function desenharCustos() {
   const celEmpresa = (i) => { const f = document.createDocumentFragment(); f.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —')); return f; };
   const nume = (k) => (i) => Number(i[k]) || 0;
   tabelaExcel('custeio-itens', [
-    { rot: 'Item', valor: (i) => i.titulo, celula: (i) => { const b = el('button', 'btn-texto', i.titulo); if (todosItens().some((x) => x.id === i.id)) b.addEventListener('click', () => abrirGaveta(i.id)); return b; } },
+    { rot: 'Item', valor: (i) => `${(todosItens().find((x) => x.id === i.id) || {}).codigo || ''} ${i.titulo}`, celula: (i) => { const cod = (todosItens().find((x) => x.id === i.id) || {}).codigo; const b = el('button', 'btn-texto', (cod ? cod + ' · ' : '') + i.titulo); if (todosItens().some((x) => x.id === i.id)) b.addEventListener('click', () => abrirGaveta(i.id)); return b; } },
     { rot: 'Fila', valor: (i) => i.fila, celula: (i) => tag(i.fila, 'fila', i.fila) },
     { rot: 'Empresa / produto', valor: (i) => `${i.empresa} / ${i.produto || 'sem produto'}`, celula: celEmpresa },
     { rot: 'Rodadas', n: 1, valor: nume('rodadas'), texto: (i) => num(i.rodadas) },

@@ -761,3 +761,6 @@ button.lin:hover { background: var(--sup-3); }
 .janela .atalhos { display: flex; flex-wrap: wrap; gap: .35rem; }
 .janela .nota { font-size: .74rem; color: var(--tinta-3); flex-basis: 100%; }
 @media (max-width: 640px) { .janela > div { flex: 1 1 45%; } .janela input[type="datetime-local"] { width: 100%; } }
+
+/* (27/09, M551) o número do item */
+.codigo { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--tinta-3); margin-right: .4rem; font-size: .9em; white-space: nowrap; }
