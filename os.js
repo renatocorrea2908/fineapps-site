@@ -1663,28 +1663,31 @@ const NOME_WORKFLOW = {
   'scan-segredos.yml': 'Scan de segredos', 'vigia-diario.yml': 'Vigia diário', 'backup-diario.yml': 'Backup',
   'serie-diaria.yml': 'Série diária', 'faxina-reservas.yml': 'Faxina de reservas', 'medir-actions.yml': 'Medidor de minutos', 'ping.yml': 'Ping',
 };
-function desenharComposicao(daJanela) {
-  const alvo = $('kpis-composicao'); if (!alvo) return;
+// (27/09, CEO) "já temos GitHub nas rodadas dos agentes. Quero outra dessa para workflow, para CI, etc."
+// Um card por origem, no MESMO formato e na MESMA fileira do card dos agentes (M557, medido run a run).
+const CARD_ORIGEM = { ci: 'GitHub no CI', robos: 'GitHub nos robôs de aceite e merge', rotinas: 'GitHub nas vigias e rotinas', outros_repos: 'GitHub no site e outros repositórios', outros: 'GitHub em outros workflows' };
+function kpisGithubPorOrigem(k, daJanela) {
   const jg = dadosDaJanela('company_os_meus_minutos_github', 'custos', () => desenharCustos());
-  alvo.replaceChildren(); const nota = $('nota-composicao'); nota.textContent = '';
-  if (!jg) { alvo.appendChild(el('p', 'dica', 'carregando…')); return; }
+  if (!jg) return;   // a porta ainda não respondeu: o desenho volta quando ela chegar
   const g = jg.dados || {};
-  if (jg.erro || !Array.isArray(g.categorias)) { alvo.appendChild(el('p', 'dica', 'A quebra por origem chega com a M557 — o robô mede os runs a cada 2 h.')); return; }
-  if (!g.coletado_ate) { alvo.appendChild(el('p', 'dica', 'O medidor ainda não gravou nenhum run. Ele roda a cada 2 h; o primeiro resultado aparece aqui.')); return; }
-  $('sub-composicao').textContent = `${daJanela ? rotuloJanela(JANELA.custos) : 'mês corrente'} · ${num(g.runs)} runs · medido até ${quando(g.coletado_ate)}`;
-  kpi(alvo, 'Total medido run a run', `${num(g.minutos)} min`, `${num(g.minutos_pagos)} min pagos (além da franquia) = ${moeda(g.brl)}`, 'total');
-  for (const c of g.categorias) {
-    const k = kpi(alvo, c.rotulo, `${num(c.minutos)} min`, `${pctTxt(c.pct)} · ${moeda(c.brl)} · ${num(c.runs)} run${Number(c.runs) === 1 ? '' : 's'}`, c.categoria === 'ci' && Number(c.pct) > 50 ? 'atencao' : '');
-    const lw = el('div', 's lista-fixos');
-    for (const w of (c.workflows || []).slice(0, 6)) lw.appendChild(el('span', null, `${NOME_WORKFLOW[w.workflow] || w.nome || w.workflow}${c.categoria === 'outros_repos' ? ' (' + w.repo + ')' : ''}: ${num(w.minutos)} min · ${num(w.runs)} run${Number(w.runs) === 1 ? '' : 's'}`));
-    k.appendChild(lw);
+  if (jg.erro || !Array.isArray(g.categorias) || !g.coletado_ate) {
+    kpi(k, daJanela ? 'GitHub no CI e nos robôs (janela)' : 'GitHub no CI e nos robôs', '—', jg.erro || !Array.isArray(g.categorias) ? 'medição por workflow chega com a M557' : 'o medidor ainda não gravou nenhuma execução (roda a cada 2 h)');
+    return;
   }
-  // a fatura (o card de cima) × a soma run a run — só faz sentido comparar no mês corrente
-  const mc = (RETRATO.painel && RETRATO.painel.consumo) || {};
-  if (!daJanela && mc.usado != null && mc.unidade !== 'USD') {
-    const dif = Number(mc.usado) ? Math.round(1000 * (Number(g.minutos) - Number(mc.usado)) / Number(mc.usado)) / 10 : null;
-    nota.textContent = `Fatura do GitHub no mês: ${num(mc.usado)} min · medido run a run: ${num(g.minutos)} min${dif == null ? '' : ` (${dif > 0 ? '+' : ''}${String(dif).replace('.', ',')}%)`}. A fatura fecha por dia e inclui outros repositórios; o run a run arredonda cada job ao minuto.`;
-  } else nota.textContent = g.regra || '';
+  const total = Number(g.minutos) || 0;
+  for (const cat of ['ci', 'robos', 'rotinas', 'outros_repos', 'outros']) {
+    const c = g.categorias.find((x) => x.categoria === cat);
+    if (!c && cat !== 'ci' && cat !== 'robos' && cat !== 'rotinas') continue;   // origem sem uso na janela não vira card
+    const min = c ? Number(c.minutos) : 0;
+    const d = kpi(k, CARD_ORIGEM[cat] + (daJanela ? ' (janela)' : ''), `${num(min)} min`,
+      `${total ? pctTxt(Math.round(1000 * min / total) / 10) : '—'} dos minutos · ${moeda(c ? c.brl : 0)} pagos (além da franquia)`,
+      cat === 'ci' && total && min / total > 0.5 ? 'atencao' : 'ok');
+    if (c && (c.workflows || []).length) {
+      const lw = el('div', 's lista-fixos');
+      for (const w of c.workflows.slice(0, 6)) lw.appendChild(el('span', null, `${NOME_WORKFLOW[w.workflow] || w.nome || w.workflow}${cat === 'outros_repos' ? ' (' + w.repo + ')' : ''}: ${num(w.minutos)} min · ${num(w.runs)} execuç${Number(w.runs) === 1 ? 'ão' : 'ões'}`));
+      d.appendChild(lw);
+    }
+  }
 }
 
 /* ── ABA Custos ───────────────────────────────────────────────────────────── */
@@ -1722,6 +1725,7 @@ function desenharCustos() {
   if (Number(cu.cambio)) lf.appendChild(el('span', 'cambio', `câmbio ${Number(cu.cambio).toFixed(2).replace('.', ',')}`));
   kf.appendChild(lf);
   kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
+  kpisGithubPorOrigem(k, daJanela);
   kpi(k, daJanela ? 'Custo real na janela' : 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : daJanela ? rotJ : cu.provisorio ? 'fixos + excedente de Actions · provisório até o mês fechar' : 'mês fechado');
   // (27/09, CEO) o cartão abre, em fonte menor, o médio do Claude e do GitHub — minutos e dinheiro
   const km = kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo real ÷ ${num(itensC.length)} item(ns) trabalhados · ${rotJ}`);
@@ -1734,7 +1738,6 @@ function desenharCustos() {
     km.appendChild(lm);
   }
   kpi(k, 'Parado esperando você', moeda(c.gasto_parado_esperando_voce), 'consumo já feito em itens travados');
-  desenharComposicao(daJanela);
 
   // custo real por item
   $('sub-custeio').textContent = `${daJanela ? rotJ : cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ''}`;
