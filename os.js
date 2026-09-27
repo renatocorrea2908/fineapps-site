@@ -133,14 +133,17 @@ async function renovar() {
   guardarSessao(j);
 }
 
-async function rpc(fn, corpo, tentouRenovar) {
+async function rpc(fn, corpo, tentouRenovar, tentouDeNovo) {
   const r = await fetch(`${SUPABASE}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: PUBLICA, Authorization: `Bearer ${SESSAO.access_token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(corpo || {}),
   });
-  if (r.status === 401 && !tentouRenovar) { await renovar(); return rpc(fn, corpo, true); }
+  if (r.status === 401 && !tentouRenovar) { await renovar(); return rpc(fn, corpo, true, tentouDeNovo); }
   const texto = await r.text();
+  // (27/09) 57014 = o banco cortou a consulta pelo teto de tempo; a consulta cortada é desfeita, então
+  // repetir UMA vez é seguro — medido: a 2ª tentativa costuma responder (o 1º corte é o banco ocupado)
+  if (!r.ok && !tentouDeNovo && /57014|statement timeout/.test(texto)) { await new Promise((ok) => setTimeout(ok, 1500)); return rpc(fn, corpo, tentouRenovar, true); }
   if (!r.ok) {
     let msg = texto;
     try { msg = JSON.parse(texto).message || texto; } catch { /* texto cru serve */ }
