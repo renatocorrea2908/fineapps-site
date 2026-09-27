@@ -768,7 +768,8 @@ function caixa(cls, papel, nome, sub, c, pressed, onClick) {
 function desenharOrg() {
   const org = $('org'); org.replaceChildren();
   // base sem os filtros de fila/produto/pendente, para as caixas mostrarem o todo e o clique filtrar
-  const guardados = { fila: F.fila, produto: F.produto, pendente: F.pendente, squad: F.squad }; delete F.fila; delete F.produto; delete F.pendente; delete F.squad;
+  // (27/09) o estado também sai: com o filtro em "Cancelados" o mapa da casa zerava e parecia que ninguém trabalhava
+  const guardados = { fila: F.fila, produto: F.produto, pendente: F.pendente, squad: F.squad, estado: F.estado }; delete F.fila; delete F.produto; delete F.pendente; delete F.squad; delete F.estado;
   const base = todosItens().filter(passa);
   Object.assign(F, Object.fromEntries(Object.entries(guardados).filter(([, v]) => v !== undefined)));
 
@@ -1086,6 +1087,21 @@ $('btn-ciencia').addEventListener('click', () => {
   acaoAviso('company_os_dar_ciencia', { p_ids: ids }, `Ciência registrada em ${ids.length} aviso(s).`)
 })
 
+/* (27/09, CEO) % entregue sem falha e % cancelado por falha, numa janela de data e hora (M549) */
+function desenharQualidade() {
+  const alvo = $('kpis-qualidade'); if (!alvo) return;
+  barraJanela('janela-qualidade', 'qualidade', () => ({ de: new Date(Date.now() - 7 * 864e5), ate: new Date() }), () => desenharQualidade());
+  const jq = dadosDaJanela('company_os_minha_qualidade', 'qualidade', () => desenharQualidade());
+  alvo.replaceChildren();
+  if (!jq) { alvo.appendChild(el('p', 'dica', 'carregando…')); return; }
+  if (jq.erro || !jq.dados || jq.dados.encerrados == null) { alvo.appendChild(el('p', 'dica', 'A medida de qualidade chega com a M549.')); return; }
+  const q = jq.dados; const pct = (v) => (v == null ? '—' : String(v).replace('.', ',') + '%');
+  kpi(alvo, 'Entregues sem falha', pct(q.pct_entregues_sem_falha), `${num(q.concluidos_sem_falha)} de ${num(q.encerrados)} encerrados · ${num(q.concluidos_com_falha)} concluídos depois de falhar`, q.pct_entregues_sem_falha == null ? '' : q.pct_entregues_sem_falha >= 70 ? 'ok' : 'atencao');
+  kpi(alvo, 'Cancelados por falha', pct(q.pct_cancelados_por_falha), `${num(q.cancelados_por_falha)} de ${num(q.encerrados)} encerrados · ${num(q.divididos)} divididos (fora da conta)`, q.pct_cancelados_por_falha > 10 ? 'atencao' : 'ok');
+  kpi(alvo, 'Rodadas por item concluído', q.rodadas_por_concluido == null ? '—' : String(q.rodadas_por_concluido).replace('.', ','), 'quantas vezes o executor pegou o item até concluir');
+  $('sub-qualidade').textContent = `itens encerrados em ${rotuloJanela(JANELA.qualidade)} · falha = rodada que voltou ou entrega recusada`;
+}
+
 function desenharMonitor() {
   const vig = RETRATO.vigilancia || { total: 0, vermelhos: [] };
   const p = RETRATO.plantao || {};
@@ -1103,6 +1119,7 @@ function desenharMonitor() {
   const os29 = inv.find((i) => i.id === 'OS29'); const rampaParada = (os29 && os29.detalhes && os29.detalhes.parados || []).length;
   kpi(k, 'Aceite Técnico parado', num(rampaParada), 'entrega técnica há mais de 2 h sem decisão do CI/CTO', rampaParada ? 'atencao' : 'ok');
   kpi(k, 'Último despacho', p.ultimo_despacho ? hhmm(p.ultimo_despacho) : '—', p.ultimo_despacho ? dia(p.ultimo_despacho) : 'o banco ainda não acordou o executor');
+  desenharQualidade();
 
   $('sub-reguas').textContent = vig.vermelhos.length === 0 ? 'todas verdes — o CI lê estas mesmas réguas contra a produção a cada push' : `${vig.vermelhos.length} vermelha(s): os números do painel podem não valer nada até ficarem verdes`;
   // ⚠ 47 linhas iguais escondiam a que importa. Agora: um quadradinho por
@@ -1443,8 +1460,54 @@ function desenharMedias(cu, itensC, filtrado) {
   ], linhasM, { barra: 'barra-medias', unidade: 'grupo(s)' });
   const nota = $('medias-nota');
   nota.textContent = MEDIA_POR === 'agente'
-    ? (cu.por_agente ? `Por agente não segue os filtros de cima. A Triagem roda sem item e fica fora do rateio: ${num(cu.triagem && cu.triagem.rodadas)} rodadas este mês.` : 'O custo por agente chega com a M473.')
+    ? (cu.por_agente ? `Por agente não segue os filtros de cima. A Triagem roda sem item e fica fora do rateio: ${num(cu.triagem && cu.triagem.rodadas)} rodadas no período.` : 'O custo por agente chega com a M473.')
     : `${MEDIA_POR === 'cliente' ? 'Cliente = a empresa dona do item. ' : ''}${filtrado ? 'Segue os filtros de cima.' : ''}`;
+}
+
+/* ── JANELA DE DATA E HORA (27/09, CEO) ─────────────────────────────────────
+   "Quanto custou de sábado 21h a domingo 10h?" O banco responde qualquer janela
+   (M549); a tela guarda a janela escolhida e pede os números uma vez por janela. */
+const JANELA = {};
+const DADOS_JANELA = {};
+const doisDig = (n) => String(n).padStart(2, '0');
+const paraInput = (d) => `${d.getFullYear()}-${doisDig(d.getMonth() + 1)}-${doisDig(d.getDate())}T${doisDig(d.getHours())}:${doisDig(d.getMinutes())}`;
+const inicioDoMes = () => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; };
+const inicioDoDia = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+function janelaDe(chaveJ, padrao) { if (!JANELA[chaveJ]) JANELA[chaveJ] = padrao(); return JANELA[chaveJ]; }
+function rotuloJanela(j) {
+  const f = (d) => d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return `${f(j.de)} → ${f(j.ate)}`;
+}
+function barraJanela(alvoId, chaveJ, padrao, aoMudar, nota) {
+  const alvo = $(alvoId); if (!alvo) return;
+  const j = janelaDe(chaveJ, padrao);
+  alvo.replaceChildren();
+  const campo = (rot, v) => { const w = el('div'); const lb = el('label', null, rot); const i = el('input'); i.type = 'datetime-local'; i.value = paraInput(v); w.append(lb, i); return [w, i]; };
+  const [wDe, iDe] = campo('De', j.de); const [wAte, iAte] = campo('Até', j.ate);
+  const aplicar = (de, ate) => { if (!(de < ate)) { toast('O fim tem de vir depois do início.'); return; } JANELA[chaveJ] = { de, ate }; aoMudar(); };
+  iDe.addEventListener('change', () => aplicar(new Date(iDe.value), new Date(iAte.value)));
+  iAte.addEventListener('change', () => aplicar(new Date(iDe.value), new Date(iAte.value)));
+  const at = el('div', 'atalhos');
+  for (const [r, f] of [['Hoje', () => [inicioDoDia(), new Date()]], ['24 h', () => [new Date(Date.now() - 864e5), new Date()]],
+                        ['7 dias', () => [new Date(Date.now() - 7 * 864e5), new Date()]], ['Este mês', () => [inicioDoMes(), new Date()]]]) {
+    const b = el('button', 'badge', r); b.type = 'button'; b.addEventListener('click', () => { const [de, ate] = f(); aplicar(de, ate); }); at.appendChild(b);
+  }
+  alvo.append(wDe, wAte, at);
+  if (nota) alvo.appendChild(el('span', 'nota', nota));
+}
+// pede à porta uma vez por janela; enquanto não chega, quem desenha usa o que tem e é chamado de novo
+function dadosDaJanela(fn, chaveJ, aoChegar) {
+  const j = JANELA[chaveJ]; if (!j) return null;
+  const k = `${fn}|${j.de.toISOString()}|${j.ate.toISOString()}`;
+  const c = DADOS_JANELA[k];
+  if (c && c.pronto) return c;
+  if (!c) {
+    DADOS_JANELA[k] = { pronto: false };
+    rpc(fn, { p_de: j.de.toISOString(), p_ate: j.ate.toISOString() })
+      .then((d) => { DADOS_JANELA[k] = { pronto: true, dados: d || {} }; aoChegar(); })
+      .catch((e) => { DADOS_JANELA[k] = { pronto: true, erro: String(e.message || e) }; aoChegar(); });
+  }
+  return null;
 }
 
 /* ── ABA Custos ───────────────────────────────────────────────────────────── */
@@ -1459,7 +1522,15 @@ function desenharCustos() {
   const grave = mc.faixa === 'estourado' ? 'vermelho' : (mc.faixa === 'aviso_2' || mc.faixa === 'aviso_3') ? 'ambar' : null;
   pc.hidden = !grave;
   if (grave) { pc.className = 'pill ' + grave; pc.textContent = `${String(mc.percentual).replace('.', ',')}%`; pc.title = mc.aviso || ''; }
-  const c = RETRATO.custos || {}; const cu = c.custeio || {};
+  const c = RETRATO.custos || {};
+  // (27/09) a janela escolhida manda; até a porta responder (ou se ela ainda não existir) vale o mês do retrato
+  barraJanela('janela-custos', 'custos', () => ({ de: inicioDoMes(), ate: new Date() }), () => desenharCustos());
+  const jc = dadosDaJanela('company_os_meu_custeio', 'custos', () => desenharCustos());
+  const daJanela = !!(jc && jc.dados && jc.dados.itens);
+  const cu = daJanela ? jc.dados : (c.custeio || {});
+  const rotJ = daJanela ? rotuloJanela(JANELA.custos) : 'mês corrente';
+  if (jc && jc.erro) $('janela-custos').appendChild(el('span', 'nota', 'A janela de datas chega com a M549 — até lá, os números são do mês corrente.'));
+  else if (!jc) $('janela-custos').appendChild(el('span', 'nota', 'carregando a janela…'));
   const filtrado = !!(F.empresa || F.produto || F.fila);
   const passaC = (i) => (!F.empresa || i.empresa === F.empresa) && (!F.produto || (i.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, i.fila));
   const itensC = (cu.itens || []).filter(passaC);
@@ -1468,18 +1539,27 @@ function desenharCustos() {
   const ac = cu.actions || {};
   const k = $('kpis-custos'); k.replaceChildren();
   // (26/09, CEO) o card diz QUAIS são os contratos e quanto cada um vale — a lista miúda cabe no próprio card
-  const kf = kpi(k, 'Custo fixo do mês', moeda(cu.fixos_brl), null);
+  const kf = kpi(k, daJanela ? 'Custos fixos na janela' : 'Custo fixo do mês', moeda(cu.fixos_brl), null);
   const lf = el('div', 's lista-fixos');
-  for (const f of (cu.fixos || [])) lf.appendChild(el('span', null, `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' = ' : ''}${moeda(f.valor_brl)}`));
+  for (const f of (cu.fixos || [])) lf.appendChild(el('span', null, `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' = ' : ''}${moeda(f.valor_brl)}/mês${f.na_janela_brl != null ? ' · na janela ' + moeda(f.na_janela_brl) : ''}`));
   if (Number(cu.cambio)) lf.appendChild(el('span', 'cambio', `câmbio ${Number(cu.cambio).toFixed(2).replace('.', ',')}`));
   kf.appendChild(lf);
-  kpi(k, 'GitHub Actions no mês', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min além da franquia = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
-  kpi(k, 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : cu.provisorio ? 'fixos + excedente de Actions · provisório até o mês fechar' : 'mês fechado');
-  kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo real ÷ ${num(itensC.length)} item(ns) trabalhados no mês`);
+  kpi(k, daJanela ? 'GitHub Actions na janela' : 'GitHub Actions no mês', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
+  kpi(k, daJanela ? 'Custo real na janela' : 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : daJanela ? rotJ : cu.provisorio ? 'fixos + excedente de Actions · provisório até o mês fechar' : 'mês fechado');
+  // (27/09, CEO) o cartão abre, em fonte menor, o médio do Claude e do GitHub — minutos e dinheiro
+  const km = kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo real ÷ ${num(itensC.length)} item(ns) trabalhados · ${rotJ}`);
+  if (itensC.length) {
+    const soma = (f) => itensC.reduce((t, i) => t + Number(i[f] || 0), 0) / itensC.length;
+    const lm = el('div', 's lista-fixos');
+    lm.appendChild(el('span', null, daJanela ? `Claude: ${moeda(soma('claude_brl'))} · ${num(Math.round(soma('claude_min')))} min por item` : 'Claude: por janela, com a M549'));
+    lm.appendChild(el('span', null, `GitHub: ${num(Math.round(soma('minutos')))} min · ${moeda(soma('actions_brl'))} por item`));
+    if (daJanela && cu.claude) lm.appendChild(el('span', 'cambio', `Claude nocional (não cobrado): US$ ${Number(cu.claude.usd_nocional || 0).toFixed(2)} na janela`));
+    km.appendChild(lm);
+  }
   kpi(k, 'Parado esperando você', moeda(c.gasto_parado_esperando_voce), 'consumo já feito em itens travados');
 
   // custo real por item
-  $('sub-custeio').textContent = `${cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ''}`;
+  $('sub-custeio').textContent = `${daJanela ? rotJ : cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ''}`;
   desenharMedias(cu, itensC, filtrado);
   const celEmpresa = (i) => { const f = document.createDocumentFragment(); f.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —')); return f; };
   const nume = (k) => (i) => Number(i[k]) || 0;
@@ -1535,8 +1615,8 @@ function desenharCustos() {
   const decl = chave(el('details'), 'det:fixos'); decl.appendChild(el('summary', null, 'Declarar ou mudar um custo fixo…')); decl.appendChild(form); pf.appendChild(decl);
 
   // rodadas recentes
-  const lanc = (c.lancamentos || []).filter((l) => (!F.empresa || l.empresa === F.empresa) && (!F.produto || (l.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, l.fila)));
-  $('sub-lanc').textContent = `${lanc.length} mais recentes${filtrado ? ' (com filtro)' : ''}`;
+  const lanc = ((daJanela ? cu.lancamentos : c.lancamentos) || []).filter((l) => (!F.empresa || l.empresa === F.empresa) && (!F.produto || (l.produto || '— sem produto —') === F.produto) && (!F.fila || bate(F.fila, l.fila)));
+  $('sub-lanc').textContent = `${lanc.length} ${daJanela ? 'na janela (até 300)' : 'mais recentes'}${filtrado ? ' (com filtro)' : ''}`;
   tabelaExcel('lancamentos', [
     { rot: 'Quando', valor: (l) => l.quando, texto: (l) => quando(l.quando), filtro: (l) => dia(l.quando) },
     { rot: 'Item', valor: (l) => l.titulo },
