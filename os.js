@@ -12,8 +12,8 @@
    ════════════════════════════════════════════════════════════════════════════ */
 'use strict';
 
-const SUPABASE = 'https://hvkmwdinnfpprhgxpfzw.supabase.co';
-const PUBLICA  = 'sb_publishable_13F7-Fl2S6MFmrWTxQFlUg_u4Ihi2T0';
+const SUPABASE = 'https://tnwlomwoktqdfgjbzvvh.supabase.co';   // (S4/D-22) a casa do OS
+const PUBLICA  = 'sb_publishable_ggXRY3l0pefgFGfwkmne3Q_DOTju8Ma';
 const CHAVE_SESSAO = 'fineapps.os.sessao';
 
 let SESSAO = null;
