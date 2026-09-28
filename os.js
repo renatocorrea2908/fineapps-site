@@ -484,6 +484,19 @@ function tag(rotulo, chave, valor) {
   s.addEventListener('click', (e) => { e.stopPropagation(); alternar(chave, valor); });
   return s;
 }
+/* (28/09, OS-59.5) o chamado que originou o item vira link: url_base do produto (M597) +
+   ?abrir=chamado_id (M607) — o mesmo formato que src/lib/abrir-registro.ts lê no Stratum.
+   Sem url_base declarada ou sem chamado_id, não aparece nada (nunca um link quebrado). */
+function linkChamado(i) {
+  if (!i.chamado_id) return null;
+  const pInfo = (RETRATO.estrutura.produtos || []).find((p) => p.nome === i.produto);
+  if (!pInfo || !pInfo.url_base) return null;
+  const a = el('a', 'ligacao', 'Abrir o chamado em nova aba');
+  a.appendChild(icone('externo'));
+  a.href = `${pInfo.url_base}?abrir=${i.chamado_id}`;
+  a.target = '_blank'; a.rel = 'noopener noreferrer';
+  return a;
+}
 function cartaoItem(i, opts = {}) {
   const tom = tomDoItem(i);
   const cx = el('article', 'item clicavel' + (tom === 'parado' ? ' urgente' : pendente(i) && aberto(i) ? ' espera' : '') + (GAVETA === i.id ? ' aberto' : ''));
@@ -564,6 +577,7 @@ function desenharGaveta() {
   c.appendChild(el('div', 'descricao', i.descricao || '(este item não tem descrição registrada)'));
   if (i.ultima_falha) { c.appendChild(el('h3', null, 'Última falha')); c.appendChild(el('p', 'falha', `${quando(i.ultima_falha_em)} — ${i.ultima_falha}`)); }
   c.appendChild(el('h3', null, 'Caminho'));
+  const lc = linkChamado(i); if (lc) c.appendChild(lc);
   const p = desenharPath(i, 'det:gaveta-caminho:'); const d = p.querySelector('details'); if (d) d.open = true; c.appendChild(p);
 }
 
@@ -648,6 +662,7 @@ function desenharCaixa(modo) {
     cx.id = 'caixa-' + p.id;
     if (i) { const cab = el('button', 'item-cab'); cab.title = 'Abrir o detalhe'; cab.appendChild(el('h4', null, p.titulo)); cab.addEventListener('click', () => abrirGaveta(i.id)); cx.appendChild(cab); }
     else cx.appendChild(el('h4', null, p.titulo));
+    if (i) { const lc = linkChamado(i); if (lc) cx.appendChild(lc); }
     const m = el('div', 'meta');
     // ⚠ Aprovações montava o próprio cartão e por isso ficou de fora da
     //    primeira passada — a aba mais importante da tela seguia com a linha
