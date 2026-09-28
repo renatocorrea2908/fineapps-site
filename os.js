@@ -526,6 +526,7 @@ function cartaoItem(i, opts = {}) {
   cab.appendChild(m);
   cab.addEventListener('click', () => abrirGaveta(i.id));
   cx.appendChild(cab);
+  const lc = linkChamado(i); if (lc) cx.appendChild(lc);
   if (opts.rodape) cx.appendChild(opts.rodape);
   return subirDir(cx);
 }
