@@ -879,7 +879,7 @@ const TIPOS = {
 const IMPACTOS = { none: null, low: 'impacto baixo', medium: 'impacto médio', high: 'impacto alto', critical: 'impacto crítico' };
 const PRIORIDADES = { critica: 'crítica', alta: 'alta', media: 'média', baixa: 'baixa' };
 const rotuloTipo = (k) => TIPOS[k] || String(k || '—').replace(/_/g, ' ');
-/* (28/09, M573) de onde o item veio — gravado no banco no nascimento do item; a parte herda do pai. */
+/* (28/09, M587) de onde o item veio — gravado no banco no nascimento do item; a parte herda do pai. */
 const ORIGENS = {
   chamado_bug: 'chamado · bug', chamado_melhoria: 'chamado · melhoria', pedido_ceo: 'pedido do CEO', pergunta_ceo: 'pergunta do CEO',
   backlog_en: 'backlog de engenharia', vigia: 'achado do Vigia', ci_vermelho: 'CI vermelho', sistema: 'sistema',
@@ -891,7 +891,7 @@ function tagNatureza(i) {
   return t;
 }
 function tagOrigem(i) {
-  if (!ORIGENS[i.origem]) return document.createTextNode('');   // antes da M573 o retrato mandava pessoa/cliente/sistema: não mostra
+  if (!ORIGENS[i.origem]) return document.createTextNode('');   // antes da M587 o retrato mandava pessoa/cliente/sistema: não mostra
   const t = tag(rotuloOrigem(i.origem) + (i.origem_ref ? ` ${i.origem_ref}` : ''), 'origem', i.origem);
   t.classList.add('tag-origem', 'o-' + i.origem);
   return t;
