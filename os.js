@@ -1149,6 +1149,8 @@ function desenharAvisos() {
     if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO / CTO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em Organograma.'))
     else {
       const inp = chave(el('input'), 'perg:' + a.id); inp.placeholder = 'Perguntar ao COO / CTO (mínimo 10 letras)'
+      // (M622) pedido devolvido por ser PERGUNTA: o texto do CEO já vem no campo — um clique e vai ao COO
+      if (a.medido && a.medido.pergunta_sugerida && !inp.value) inp.value = String(a.medido.pergunta_sugerida)
       const b2 = el('button', 'btn', 'Perguntar')
       b2.addEventListener('click', () => {
         if (inp.value.trim().length < 10) { mostrar($('msg-avisos'), 'Escreva a pergunta (mínimo 10 letras).', false); return }
@@ -1799,11 +1801,24 @@ function desenharCustos() {
   for (const f of (cu.fixos || [])) lf.appendChild(el('span', null, `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' = ' : ''}${moeda(f.valor_brl)}/mês${f.na_janela_brl != null ? ' · na janela ' + moeda(f.na_janela_brl) : ''}`));
   if (Number(cu.cambio)) lf.appendChild(el('span', 'cambio', `câmbio ${Number(cu.cambio).toFixed(2).replace('.', ',')}`));
   kf.appendChild(lf);
-  kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
+  // (M621, pedido do CEO 662fe1ae) o card dos agentes lê a MESMA medição run a run dos outros cards (franquia uma vez só);
+  // o medidor por rodada dava a franquia inteira aos agentes. Sem a M621 no banco, cai no número antigo.
+  const gtAg = cu.github_todos && Array.isArray(cu.github_todos.categorias) ? cu.github_todos.categorias.find((x) => x.categoria === 'agentes') : null;
+  if (gtAg) kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Number(gtAg.minutos))} min`, `${Number(cu.github_todos.minutos) ? pctTxt(Math.round(1000 * Number(gtAg.minutos) / Number(cu.github_todos.minutos)) / 10) : '—'} dos minutos · ${moeda(gtAg.brl)} pagos (além da franquia)`, Number(gtAg.brl) > 0 ? 'atencao' : 'ok');
+  else kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
   kpisGithubPorOrigem(k, daJanela);
-  kpi(k, daJanela ? 'Custo real na janela' : 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : daJanela ? rotJ : cu.provisorio ? 'fixos + excedente de Actions · provisório até o mês fechar' : 'mês fechado');
+  // (M621) custo real = fixos + o GitHub PAGO de TODOS os workflows (rodadas, CI, robôs, vigias) — a conta do CEO fecha no card
+  const gt = cu.github_todos || null;
+  const kr = kpi(k, daJanela ? 'Custo real na janela' : 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : daJanela ? rotJ : cu.provisorio ? 'fixos + GitHub de todos os workflows · provisório até o mês fechar' : 'mês fechado');
+  if (gt) {
+    const lr = el('div', 's lista-fixos');
+    lr.appendChild(el('span', null, `Fixos: ${moeda(cu.fixos_brl)}`));
+    lr.appendChild(el('span', null, `GitHub pago (todos os workflows): ${moeda(gt.brl)} · ${num(Number(gt.minutos_pagos))} de ${num(Number(gt.minutos))} min além da franquia de ${num(Number(gt.franquia))}`));
+    if (gt.coletado_ate) lr.appendChild(el('span', 'cambio', `GitHub medido até ${new Date(gt.coletado_ate).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} (o medidor grava a cada 2 h)`));
+    kr.appendChild(lr);
+  }
   // (27/09, CEO) o cartão abre, em fonte menor, o médio do Claude e do GitHub — minutos e dinheiro
-  const km = kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo real ÷ ${num(itensC.length)} item(ns) trabalhados · ${rotJ}`);
+  const km = kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo das rodadas ÷ ${num(itensC.length)} item(ns) · ${rotJ} · CI e robôs ainda não rateados por item`);
   if (itensC.length) {
     const soma = (f) => itensC.reduce((t, i) => t + Number(i[f] || 0), 0) / itensC.length;
     const lm = el('div', 's lista-fixos');
@@ -2020,7 +2035,7 @@ function desenharInicio() {
   const unidade = cons.unidade === 'USD' ? (n) => 'US$ ' + Number(n).toFixed(2).replace('.', ',') : (n) => num(n) + ' min';
   const kc = kpi(k, 'Consumo de Actions', cons.percentual == null ? '—' : `${String(cons.percentual).replace('.', ',')}%`, cons.usado == null ? 'sem medição' : `${unidade(cons.usado)} de ${unidade(cons.teto)}`, fx, () => irPara('custos'), false, 'medidor');
   if (cons.percentual != null) { const t = el('div', 'mini-trilho'); const sp = el('span'); sp.style.width = Math.min(100, Number(cons.percentual)) + '%'; t.appendChild(sp); kc.appendChild(t); }
-  kpi(k, 'Custo real do mês', moeda(cu.custo_real_total), cu.provisorio ? 'fixos + excedente · provisório' : 'mês fechado', '', () => irPara('custos'), false, 'dinheiro');
+  kpi(k, 'Custo real do mês', moeda(cu.custo_real_total), cu.provisorio ? 'fixos + GitHub · provisório' : 'mês fechado', '', () => irPara('custos'), false, 'dinheiro');
 
   // Precisa de você
   const porId = new Map(todosItens().map((i) => [i.id, i]));
