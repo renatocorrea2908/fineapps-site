@@ -103,6 +103,19 @@
         <label for="f-produto">Produto</label>
         <select id="f-produto"><option value="">Todos</option></select>
       </div>
+      <!-- (28/09, CEO) as três etiquetas do item: natureza, origem, tipo -->
+      <div class="filtro-grupo">
+        <label for="f-natureza">Natureza</label>
+        <select id="f-natureza"><option value="">Todas</option><option value="técnico">Técnico</option><option value="negócio">Negócio</option></select>
+      </div>
+      <div class="filtro-grupo">
+        <label for="f-origem">Origem</label>
+        <select id="f-origem"><option value="">Todas</option></select>
+      </div>
+      <div class="filtro-grupo">
+        <label for="f-tipo">Tipo</label>
+        <select id="f-tipo"><option value="">Todos</option></select>
+      </div>
       <div class="chips" id="chips"></div>
       <button id="limpar" class="btn-texto" hidden>Limpar filtros</button>
     </div>
@@ -317,6 +330,8 @@
           <div><label for="r-ate">Até</label><input type="date" id="r-ate"></div>
           <div><label for="r-fila">Fila</label><select id="r-fila"><option value="">Todas</option></select></div>
           <div><label for="r-quem">Quem abriu</label><select id="r-quem"><option value="">Todos</option></select></div>
+          <div><label for="r-origem">Origem</label><select id="r-origem"><option value="">Todas</option></select></div>
+          <div><label for="r-tipo">Tipo</label><select id="r-tipo"><option value="">Todos</option></select></div>
           <div><label for="r-nat">Natureza</label><select id="r-nat"><option value="">Todas</option><option value="técnico">Técnico</option><option value="negócio">Negócio</option></select></div>
           <div><label for="r-base">Data-base</label><select id="r-base"><option value="criado">Abertura</option><option value="atualizado">Última mudança</option><option value="concluido">Conclusão</option></select></div>
         </div>

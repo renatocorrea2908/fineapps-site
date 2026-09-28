@@ -805,3 +805,13 @@ button.lin:hover { background: var(--sup-3); }
 .md code { font-size: .85em; background: var(--sup-3); padding: .05rem .3rem; border-radius: 4px; }
 .md pre { background: var(--sup-3); padding: .8rem; border-radius: var(--raio-p); overflow-x: auto; font-size: .82rem; }
 @media (max-width: 640px) { .leitor { padding: 0 1rem 1rem; } .desvio-linha { flex-wrap: wrap; } }
+
+/* (28/09, CEO) as três etiquetas do item — natureza · origem · tipo. Pílula discreta; a cor só
+   marca o que pede olhar: chamado (bug/melhoria de cliente) e o que veio do próprio CEO. */
+.item .meta .tag-nat, .item .meta .tag-origem, .tabela td .tag-nat, .tabela td .tag-origem {
+  border: 1px solid var(--linha-2); border-radius: 999px; padding: .02rem .45rem; margin: 0; font-size: .92em; }
+.tag-nat.tec { color: var(--info-tinta); border-color: var(--info-borda) !important; background: var(--info-suave); }
+.tag-nat.neg { color: var(--marca-tinta); border-color: var(--marca-borda) !important; background: var(--marca-suave); }
+.tag-origem.o-chamado_bug { color: var(--erro-tinta); border-color: var(--erro-borda) !important; background: var(--erro-suave); }
+.tag-origem.o-chamado_melhoria { color: var(--alerta-tinta); border-color: var(--alerta-borda) !important; background: var(--alerta-suave); }
+.tag-origem.o-pedido_ceo, .tag-origem.o-pergunta_ceo { color: var(--tinta); border-color: var(--tinta-3) !important; }

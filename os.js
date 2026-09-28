@@ -247,7 +247,7 @@ function esqueleto() {
 
 /* ── filtro cruzado ───────────────────────────────────────────────────────── */
 const ROTULO_F = { empresa: 'Empresa', produto: 'Produto', fila: 'Fila', estado: 'Status', natureza: 'Natureza', quem: 'Quem abriu',
-                   tipo: 'Tipo', prioridade: 'Prioridade', pendente: 'Parado em você', caminho: 'Caminho', squad: 'Squad', executor: 'Executor', qualidade: 'Qualidade' };
+                   tipo: 'Tipo', origem: 'Origem', prioridade: 'Prioridade', pendente: 'Parado em você', caminho: 'Caminho', squad: 'Squad', executor: 'Executor', qualidade: 'Qualidade' };
 // (27/09, CEO) o card de qualidade do Monitor leva a Itens filtrado pelos itens que ELE contou (a porta devolve os ids)
 let QUAL_SEL = null;
 function alternar(chave, valor) {
@@ -260,6 +260,10 @@ function limpar() { for (const k of Object.keys(F)) delete F[k]; render(); }
 $('limpar').addEventListener('click', limpar);
 $('f-empresa').addEventListener('change', (e) => { if (e.target.value) F.empresa = e.target.value; else delete F.empresa; delete F.produto; render(); });
 $('f-produto').addEventListener('change', (e) => { if (e.target.value) F.produto = e.target.value; else delete F.produto; render(); });
+// (28/09, CEO) natureza, origem e tipo também no alto — o mesmo filtro que o clique na etiqueta liga
+for (const k of ['natureza', 'origem', 'tipo']) {
+  $('f-' + k).addEventListener('change', (e) => { if (e.target.value) F[k] = e.target.value; else delete F[k]; render(); });
+}
 
 /* ⚠ (26/09) "O que espera por VOCÊ" é o que o banco pôs na sua caixa
    (`inbox`, de `pendencias_do_ceo`) — e mais nada. A tela decidia sozinha
@@ -279,6 +283,7 @@ function passa(i) {
   if (F.natureza && i.natureza !== F.natureza) return false;
   if (F.quem && i.quem_abriu !== F.quem) return false;
   if (F.tipo && i.tipo !== F.tipo) return false;
+  if (F.origem && i.origem !== F.origem) return false;
   if (F.prioridade && i.prioridade !== F.prioridade) return false;
   if (F.squad && i.squad !== F.squad) return false;
   if (F.executor && i.executor !== F.executor) return false;
@@ -297,7 +302,8 @@ const todosItens = () => RETRATO.itens || [];
 
 function desenharChips() {
   const c = $('chips'); c.replaceChildren();
-  const chaves = Object.keys(F).filter((k) => k !== 'empresa' && k !== 'produto');
+  const NO_ALTO = ['empresa', 'produto', 'natureza', 'origem', 'tipo'];   // estes têm seletor próprio no alto
+  const chaves = Object.keys(F).filter((k) => !NO_ALTO.includes(k));
   for (const k of chaves) {
     const chip = el('span', 'chip');
     const v = F[k];
@@ -309,6 +315,12 @@ function desenharChips() {
   $('f-produto').value = F.produto || '';
   $('f-empresa').classList.toggle('ativo', !!F.empresa);
   $('f-produto').classList.toggle('ativo', !!F.produto);
+  for (const k of ['natureza', 'origem', 'tipo']) {
+    const s = $('f-' + k);
+    // valor filtrado que não está na lista (ex.: tipo que só aparece em item antigo) entra na hora — nunca some
+    if (F[k] && ![...s.options].some((o) => o.value === F[k])) s.appendChild(new Option(k === 'tipo' ? rotuloTipo(F[k]) : k === 'origem' ? rotuloOrigem(F[k]) : F[k], F[k]));
+    s.value = F[k] || ''; s.classList.toggle('ativo', !!F[k]);
+  }
   $('limpar').hidden = Object.keys(F).length === 0;
 }
 
@@ -334,6 +346,16 @@ function montarSeletores() {
   // report
   const rf = $('r-fila'); const vF = rf.value;
   rf.replaceChildren(new Option('Todas', '')); for (const f of est.filas || []) rf.appendChild(new Option(f.nome, f.nome)); rf.value = vF;
+  // origem e tipo: os que existem nos itens, na ordem do catálogo (alto da tela e Report)
+  const origens = Object.keys(ORIGENS).filter((o) => todosItens().some((i) => i.origem === o));
+  const tipos = [...new Set(todosItens().map((i) => i.tipo).filter(Boolean))].sort((a, b) => rotuloTipo(a).localeCompare(rotuloTipo(b), 'pt-BR'));
+  for (const [id, todos, lista, rot] of [['f-origem', 'Todas', origens, rotuloOrigem], ['r-origem', 'Todas', origens, rotuloOrigem],
+                                          ['f-tipo', 'Todos', tipos, rotuloTipo], ['r-tipo', 'Todos', tipos, rotuloTipo]]) {
+    const sel = $(id); const v = sel.value;
+    sel.replaceChildren(new Option(todos, ''));
+    for (const x of lista) sel.appendChild(new Option(rot(x), x));
+    sel.value = v;
+  }
   const rq = $('r-quem'); const vQ = rq.value;
   rq.replaceChildren(new Option('Todos', ''));
   for (const q of [...new Set(todosItens().map((i) => i.quem_abriu).filter(Boolean))].sort()) rq.appendChild(new Option(q, q));
@@ -468,6 +490,8 @@ function cartaoItem(i, opts = {}) {
   m.append(tag(i.empresa || '—', 'empresa', i.empresa),
            tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
            tag(i.fila, 'fila', i.fila), div(),
+           // (28/09, CEO) as três etiquetas: natureza · origem · tipo
+           tagNatureza(i), tagOrigem(i),
            tag(rotuloTipo(i.tipo), 'tipo', i.tipo),
            tag(PRIORIDADES[i.prioridade] || i.prioridade, 'prioridade', i.prioridade));
   const imp = IMPACTOS[i.impacto];
@@ -517,6 +541,7 @@ function desenharGaveta() {
   par('Prioridade', PRIORIDADES[i.prioridade] || i.prioridade, 'prioridade', i.prioridade);
   par('Impacto', IMPACTOS[i.impacto] ? IMPACTOS[i.impacto].replace('impacto ', '') : null);
   par('Natureza', i.natureza, 'natureza');
+  if (ORIGENS[i.origem]) par('Origem', rotuloOrigem(i.origem) + (i.origem_ref ? ` · ${i.origem_ref}` : ''), 'origem', i.origem);
   par('Quem abriu', i.quem_abriu, 'quem');
   par('Executor', i.executor, 'executor');
   par('Aberto em', quando(i.criado)); par('Última mudança', i.atualizado ? quando(i.atualizado) : null);
@@ -620,7 +645,7 @@ function desenharCaixa(modo) {
     const escalado = p.classe === 'travado' && p.contexto && p.contexto.escalado_pelo_cto;
     m.appendChild(el('span', 'sit espera', escalado ? 'escalado pelo CTO — precisa da sua decisão' : (ROTULO_CLASSE[p.classe] || p.classe)));
     if (i) m.append(tag(i.empresa, 'empresa', i.empresa), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
-                    tag(i.fila, 'fila', i.fila), el('span', 'div', '·'), tag(rotuloTipo(i.tipo), 'tipo', i.tipo));
+                    tag(i.fila, 'fila', i.fila), el('span', 'div', '·'), tagNatureza(i), tagOrigem(i), tag(rotuloTipo(i.tipo), 'tipo', i.tipo));
     const impA = IMPACTOS[p.impacto];
     if (impA) m.appendChild(el('span', null, impA));
     const dirA = el('span', 'meta-dir');
@@ -854,6 +879,23 @@ const TIPOS = {
 const IMPACTOS = { none: null, low: 'impacto baixo', medium: 'impacto médio', high: 'impacto alto', critical: 'impacto crítico' };
 const PRIORIDADES = { critica: 'crítica', alta: 'alta', media: 'média', baixa: 'baixa' };
 const rotuloTipo = (k) => TIPOS[k] || String(k || '—').replace(/_/g, ' ');
+/* (28/09, M573) de onde o item veio — gravado no banco no nascimento do item; a parte herda do pai. */
+const ORIGENS = {
+  chamado_bug: 'chamado · bug', chamado_melhoria: 'chamado · melhoria', pedido_ceo: 'pedido do CEO', pergunta_ceo: 'pergunta do CEO',
+  backlog_en: 'backlog de engenharia', vigia: 'achado do Vigia', ci_vermelho: 'CI vermelho', sistema: 'sistema',
+};
+const rotuloOrigem = (k) => ORIGENS[k] || String(k || '—').replace(/_/g, ' ');
+function tagNatureza(i) {
+  const t = tag(i.natureza || '—', 'natureza', i.natureza);
+  t.classList.add('tag-nat', i.natureza === 'técnico' ? 'tec' : 'neg');
+  return t;
+}
+function tagOrigem(i) {
+  if (!ORIGENS[i.origem]) return document.createTextNode('');   // antes da M573 o retrato mandava pessoa/cliente/sistema: não mostra
+  const t = tag(rotuloOrigem(i.origem) + (i.origem_ref ? ` ${i.origem_ref}` : ''), 'origem', i.origem);
+  t.classList.add('tag-origem', 'o-' + i.origem);
+  return t;
+}
 
 const NOME_LUGAR = { request_intake: 'pedido', work_item: 'item', fila: 'fila', execucao: 'execução', entrega: 'entrega', aceite: 'aceite', concluido: 'concluído', mesa: 'aprovações', cancelado: 'cancelado' };
 const lugar = (l) => NOME_LUGAR[l] || l;
@@ -1812,7 +1854,7 @@ function desenharCustos() {
 }
 
 /* ── ABA Report ───────────────────────────────────────────────────────────── */
-for (const id of ['r-de', 'r-ate', 'r-fila', 'r-quem', 'r-nat', 'r-base']) $(id).addEventListener('change', () => desenharReport());
+for (const id of ['r-de', 'r-ate', 'r-fila', 'r-quem', 'r-nat', 'r-origem', 'r-tipo', 'r-base']) $(id).addEventListener('change', () => desenharReport());
 function desenharReport() {
   const de = $('r-de').value ? new Date($('r-de').value + 'T00:00:00') : null;
   const ate = $('r-ate').value ? new Date($('r-ate').value + 'T23:59:59') : null;
@@ -1824,6 +1866,8 @@ function desenharReport() {
     if ($('r-fila').value && i.fila !== $('r-fila').value) return false;
     if ($('r-quem').value && i.quem_abriu !== $('r-quem').value) return false;
     if ($('r-nat').value && i.natureza !== $('r-nat').value) return false;
+    if ($('r-origem').value && i.origem !== $('r-origem').value) return false;
+    if ($('r-tipo').value && i.tipo !== $('r-tipo').value) return false;
     return true;
   }).sort((a, b) => new Date(b[base]) - new Date(a[base]));
   const k = $('kpis-report'); k.replaceChildren();
@@ -1831,6 +1875,10 @@ function desenharReport() {
   kpi(k, 'Concluídos', num(lista.filter((i) => i.estado === 'done').length), `${num(lista.filter((i) => i.estado === 'done' && i.tem_prova).length)} com prova`, 'ok');
   kpi(k, 'Parados / travados', num(lista.filter((i) => aberto(i) && pendente(i)).length), 'precisam de você', lista.some((i) => aberto(i) && pendente(i)) ? 'atencao' : '');
   kpi(k, 'Técnico × negócio', `${num(lista.filter((i) => i.natureza === 'técnico').length)} × ${num(lista.filter((i) => i.natureza === 'negócio').length)}`, 'itens por natureza');
+  // (28/09) de onde veio o que está no período: as 3 maiores origens, o resto somado
+  const porOrigem = Object.entries(lista.reduce((m, i) => { const o = i.origem || 'sistema'; m[o] = (m[o] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]);
+  kpi(k, 'De onde veio', porOrigem.length ? `${rotuloOrigem(porOrigem[0][0])}: ${num(porOrigem[0][1])}` : '—',
+      porOrigem.slice(1, 4).map(([o, n]) => `${rotuloOrigem(o)} ${num(n)}`).join(' · ') || 'uma origem só');
   const custeio = new Map((((RETRATO.custos || {}).custeio || {}).itens || []).map((x) => [x.id, Number(x.custo_real || 0)]));
   const custoReal = (i) => custeio.has(i.id) ? custeio.get(i.id) : 0;
   kpi(k, 'Custo real (mês)', moeda(lista.reduce((s, i) => s + custoReal(i), 0)), 'rateado do que você paga · consumo: ' + moeda(lista.reduce((s, i) => s + Number(i.gasto || 0), 0)));
@@ -1844,7 +1892,9 @@ function desenharReport() {
     { rot: 'Fila', valor: (i) => i.fila, celula: (i) => tag(i.fila, 'fila', i.fila) },
     { rot: 'Status', valor: (i) => rotuloEstado(i.estado) || i.estado, celula: (i) => tag(rotuloEstado(i.estado) || i.estado, 'estado', i.estado) },
     { rot: 'Quem abriu', valor: (i) => i.quem_abriu || '—', celula: (i) => tag(i.quem_abriu || '—', 'quem', i.quem_abriu) },
-    { rot: 'Natureza', valor: (i) => i.natureza, celula: (i) => tag(i.natureza, 'natureza', i.natureza) },
+    { rot: 'Natureza', valor: (i) => i.natureza, celula: (i) => tagNatureza(i) },
+    { rot: 'Origem', valor: (i) => rotuloOrigem(i.origem) + (i.origem_ref ? ` ${i.origem_ref}` : ''), celula: (i) => tagOrigem(i) },
+    { rot: 'Tipo', valor: (i) => rotuloTipo(i.tipo), celula: (i) => tag(rotuloTipo(i.tipo), 'tipo', i.tipo) },
     { rot: 'Passos / desvios', n: 1, valor: (i) => Number((i.caminho || {}).desvios) || 0, texto: (i) => `${num((i.caminho || {}).passos_percorridos)} / ${num((i.caminho || {}).desvios)}` },
     { rot: 'Custo real', n: 1, valor: (i) => custoReal(i), texto: (i) => moeda(custoReal(i)), somar: moeda },
   ], lista, { barra: 'barra-report', unidade: 'item(ns)' });
