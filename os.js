@@ -19,7 +19,10 @@ const CHAVE_SESSAO = 'fineapps.os.sessao';
 let SESSAO = null;
 let RETRATO = null;
 let RELOGIO = null;
-const PAGINAS = ['inicio', 'aprov', 'aceite', 'avisos', 'status', 'filas', 'paths', 'monitor', 'custos', 'report', 'pedido'];
+// (28/09, G1b) 11 → 8 páginas: Caminhos e Report moram dentro de Itens; os endereços antigos (#paths, #report) levam para lá
+const PAGINAS = ['inicio', 'aprov', 'aceite', 'avisos', 'status', 'filas', 'monitor', 'custos', 'pedido'];
+const PAGINAS_ANTIGAS = { paths: ['status', 'lista'], report: ['status', 'relatorio'] };
+let MODO_ITENS = 'lista';
 let ABA = PAGINAS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inicio';
 let GAVETA = null;              // id do item aberto na gaveta de detalhe
 const F = {};                   // filtro cruzado: empresa, produto, fila, estado, natureza, quem, tipo, prioridade, pendente, caminho
@@ -247,7 +250,7 @@ function esqueleto() {
 
 /* ── filtro cruzado ───────────────────────────────────────────────────────── */
 const ROTULO_F = { empresa: 'Empresa', produto: 'Produto', fila: 'Fila', estado: 'Status', natureza: 'Natureza', quem: 'Quem abriu',
-                   tipo: 'Tipo', origem: 'Origem', prioridade: 'Prioridade', pendente: 'Parado em você', caminho: 'Caminho', squad: 'Squad', executor: 'Executor', qualidade: 'Qualidade' };
+                   tipo: 'Tipo', origem: 'Origem', cliente: 'Cliente', prioridade: 'Prioridade', pendente: 'Parado em você', caminho: 'Caminho', squad: 'Squad', executor: 'Executor', qualidade: 'Qualidade' };
 // (27/09, CEO) o card de qualidade do Monitor leva a Itens filtrado pelos itens que ELE contou (a porta devolve os ids)
 let QUAL_SEL = null;
 function alternar(chave, valor) {
@@ -261,7 +264,7 @@ $('limpar').addEventListener('click', limpar);
 $('f-empresa').addEventListener('change', (e) => { if (e.target.value) F.empresa = e.target.value; else delete F.empresa; delete F.produto; render(); });
 $('f-produto').addEventListener('change', (e) => { if (e.target.value) F.produto = e.target.value; else delete F.produto; render(); });
 // (28/09, CEO) natureza, origem e tipo também no alto — o mesmo filtro que o clique na etiqueta liga
-for (const k of ['natureza', 'origem', 'tipo']) {
+for (const k of ['natureza', 'origem', 'tipo', 'cliente']) {
   $('f-' + k).addEventListener('change', (e) => { if (e.target.value) F[k] = e.target.value; else delete F[k]; render(); });
 }
 
@@ -284,6 +287,7 @@ function passa(i) {
   if (F.quem && i.quem_abriu !== F.quem) return false;
   if (F.tipo && i.tipo !== F.tipo) return false;
   if (F.origem && i.origem !== F.origem) return false;
+  if (F.cliente && (i.cliente || INTERNO) !== F.cliente) return false;
   if (F.prioridade && i.prioridade !== F.prioridade) return false;
   if (F.squad && i.squad !== F.squad) return false;
   if (F.executor && i.executor !== F.executor) return false;
@@ -302,7 +306,7 @@ const todosItens = () => RETRATO.itens || [];
 
 function desenharChips() {
   const c = $('chips'); c.replaceChildren();
-  const NO_ALTO = ['empresa', 'produto', 'natureza', 'origem', 'tipo'];   // estes têm seletor próprio no alto
+  const NO_ALTO = ['empresa', 'produto', 'natureza', 'origem', 'tipo', 'cliente'];   // estes têm seletor próprio no alto
   const chaves = Object.keys(F).filter((k) => !NO_ALTO.includes(k));
   for (const k of chaves) {
     const chip = el('span', 'chip');
@@ -315,7 +319,7 @@ function desenharChips() {
   $('f-produto').value = F.produto || '';
   $('f-empresa').classList.toggle('ativo', !!F.empresa);
   $('f-produto').classList.toggle('ativo', !!F.produto);
-  for (const k of ['natureza', 'origem', 'tipo']) {
+  for (const k of ['natureza', 'origem', 'tipo', 'cliente']) {
     const s = $('f-' + k);
     // valor filtrado que não está na lista (ex.: tipo que só aparece em item antigo) entra na hora — nunca some
     if (F[k] && ![...s.options].some((o) => o.value === F[k])) s.appendChild(new Option(k === 'tipo' ? rotuloTipo(F[k]) : k === 'origem' ? rotuloOrigem(F[k]) : F[k], F[k]));
@@ -349,7 +353,11 @@ function montarSeletores() {
   // origem e tipo: os que existem nos itens, na ordem do catálogo (alto da tela e Report)
   const origens = Object.keys(ORIGENS).filter((o) => todosItens().some((i) => i.origem === o));
   const tipos = [...new Set(todosItens().map((i) => i.tipo).filter(Boolean))].sort((a, b) => rotuloTipo(a).localeCompare(rotuloTipo(b), 'pt-BR'));
-  for (const [id, todos, lista, rot] of [['f-origem', 'Todas', origens, rotuloOrigem], ['r-origem', 'Todas', origens, rotuloOrigem],
+  const clientes = [...new Set(todosItens().map((i) => i.cliente).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  if (todosItens().some((i) => !i.cliente)) clientes.push(INTERNO);
+  // o filtro Empresa é o DONO do item; com uma empresa só ele não separa nada e sai da tela
+  $('grupo-empresa').hidden = new Set(todosItens().map((i) => i.empresa).filter(Boolean)).size <= 1 && !F.empresa;
+  for (const [id, todos, lista, rot] of [['f-cliente', 'Todos', clientes, (x) => x], ['f-origem', 'Todas', origens, rotuloOrigem], ['r-origem', 'Todas', origens, rotuloOrigem],
                                           ['f-tipo', 'Todos', tipos, rotuloTipo], ['r-tipo', 'Todos', tipos, rotuloTipo]]) {
     const sel = $(id); const v = sel.value;
     sel.replaceChildren(new Option(todos, ''));
@@ -381,23 +389,24 @@ const TITULOS = {
   aprov: ['Aprovações', 'Pode ir? — itens que não começam sem a sua alçada'],
   aceite: ['Aceitações', 'Ficou bom? — entregas que só fecham com o seu aceite'],
   avisos: ['Avisos', 'O que você precisa saber e não exige decisão sua'],
-  status: ['Itens', 'Tudo o que está em aberto, por situação'],
+  status: ['Itens', 'Tudo o que está em aberto, por situação e caminho — ou o relatório do período'],
   filas: ['Organograma', 'Quem carrega o quê, ao vivo'],
-  paths: ['Caminhos', 'O percurso de cada item — e onde ele desviou'],
   monitor: ['Monitor', 'As réguas do sistema, as rampas de autonomia e o executor'],
   custos: ['Custos', 'Quanto você paga, quanto falta para o limite e onde foi parar'],
-  report: ['Report', 'Recorte por período, fila, quem abriu e natureza'],
   pedido: ['Novo pedido', 'Entra assinado por você; a Triagem classifica e roteia'],
 };
-function irPara(aba) { if (!PAGINAS.includes(aba)) return; ABA = aba; if (GAVETA) { GAVETA = null; desenharGaveta(); } mostrarAba(); window.scrollTo({ top: 0 }); }
+function irPara(aba) { if (PAGINAS_ANTIGAS[aba]) { MODO_ITENS = PAGINAS_ANTIGAS[aba][1]; aba = PAGINAS_ANTIGAS[aba][0]; } if (!PAGINAS.includes(aba)) return; ABA = aba; if (GAVETA) { GAVETA = null; desenharGaveta(); } mostrarAba(); window.scrollTo({ top: 0 }); }
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-aba]:not(section)'); if (b) { irPara(b.dataset.aba); return; }
   const ir = e.target.closest('[data-ir]'); if (ir) irPara(ir.dataset.ir);
 });
-window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (PAGINAS.includes(h) && h !== ABA) { ABA = h; mostrarAba(); } });
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (PAGINAS_ANTIGAS[h]) { irPara(h); return; } if (PAGINAS.includes(h) && h !== ABA) { ABA = h; mostrarAba(); } });
 function mostrarAba() {
   for (const b of $('abas').querySelectorAll('button[data-aba]')) b.setAttribute('aria-selected', String(b.dataset.aba === ABA));
   for (const s of document.querySelectorAll('section.aba')) s.hidden = s.dataset.aba !== ABA;
+  // (G1b) Itens: lista ou relatório do período
+  for (const b of document.querySelectorAll('[data-modo-itens]')) b.setAttribute('aria-selected', String(b.dataset.modoItens === MODO_ITENS));
+  $('itens-lista').hidden = MODO_ITENS !== 'lista'; $('itens-relatorio').hidden = MODO_ITENS !== 'relatorio';
   const [t, sub] = TITULOS[ABA] || ['', ''];
   $('titulo-pagina').textContent = t; $('sub-pagina').textContent = sub;
   document.title = `${t} — Command Center`;
@@ -407,16 +416,17 @@ function mostrarAba() {
 function abrirMenu() { $('lateral').classList.add('aberta'); $('veu').hidden = false; }
 function fecharMenu() { $('lateral').classList.remove('aberta'); $('veu').hidden = true; }
 $('abrir-menu').addEventListener('click', abrirMenu);
+for (const b of document.querySelectorAll('[data-modo-itens]')) b.addEventListener('click', () => { MODO_ITENS = b.dataset.modoItens; mostrarAba(); });
 $('fechar-menu').addEventListener('click', fecharMenu);
 $('veu').addEventListener('click', fecharMenu);
 
-/* ── atalhos: 1–9 e 0 páginas, N novo pedido, R atualizar, T tema, Esc fecha ── */
+/* ── atalhos: 1–8 páginas, N novo pedido, R atualizar, T tema, Esc fecha ── */
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const alvo = e.target; const digitando = alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
   if (e.key === 'Escape') { if (POP) fecharFiltro(); else if (GAVETA) fecharGaveta(); else fecharMenu(); if (digitando) alvo.blur(); return; }
   if (digitando || $('app').hidden) return;
-  if (/^[0-9]$/.test(e.key)) { const n = Number(e.key); irPara(PAGINAS[n === 0 ? 9 : n - 1]); e.preventDefault(); return; }
+  if (/^[1-8]$/.test(e.key)) { irPara(PAGINAS[Number(e.key) - 1]); e.preventDefault(); return; }
   const k = e.key.toLowerCase();
   if (k === 'n') { irPara('pedido'); setTimeout(() => $('p-titulo').focus(), 50); e.preventDefault(); }
   else if (k === 'r') { atualizarAgora(); e.preventDefault(); }
@@ -491,7 +501,7 @@ function cartaoItem(i, opts = {}) {
            tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
            tag(i.fila, 'fila', i.fila), div(),
            // (28/09, CEO) as três etiquetas: natureza · origem · tipo
-           tagNatureza(i), tagOrigem(i),
+           tagNatureza(i), tagOrigem(i), tagCliente(i),
            tag(rotuloTipo(i.tipo), 'tipo', i.tipo),
            tag(PRIORIDADES[i.prioridade] || i.prioridade, 'prioridade', i.prioridade));
   const imp = IMPACTOS[i.impacto];
@@ -541,6 +551,7 @@ function desenharGaveta() {
   par('Prioridade', PRIORIDADES[i.prioridade] || i.prioridade, 'prioridade', i.prioridade);
   par('Impacto', IMPACTOS[i.impacto] ? IMPACTOS[i.impacto].replace('impacto ', '') : null);
   par('Natureza', i.natureza, 'natureza');
+  if (i.cliente) par('Cliente', i.cliente, 'cliente');
   if (ORIGENS[i.origem]) par('Origem', rotuloOrigem(i.origem) + (i.origem_ref ? ` · ${i.origem_ref}` : ''), 'origem', i.origem);
   par('Quem abriu', i.quem_abriu, 'quem');
   par('Executor', i.executor, 'executor');
@@ -880,6 +891,8 @@ const IMPACTOS = { none: null, low: 'impacto baixo', medium: 'impacto médio', h
 const PRIORIDADES = { critica: 'crítica', alta: 'alta', media: 'média', baixa: 'baixa' };
 const rotuloTipo = (k) => TIPOS[k] || String(k || '—').replace(/_/g, ' ');
 /* (28/09, M587) de onde o item veio — gravado no banco no nascimento do item; a parte herda do pai. */
+/* (28/09, M593) o cliente para quem o item é — vem com o chamado; item sem cliente é da casa */
+const INTERNO = '— interno (da casa) —';
 const ORIGENS = {
   chamado_bug: 'chamado · bug', chamado_melhoria: 'chamado · melhoria', pedido_ceo: 'pedido do CEO', pergunta_ceo: 'pergunta do CEO',
   backlog_en: 'backlog de engenharia', vigia: 'achado do Vigia', ci_vermelho: 'CI vermelho', sistema: 'sistema',
@@ -888,6 +901,11 @@ const rotuloOrigem = (k) => ORIGENS[k] || String(k || '—').replace(/_/g, ' ');
 function tagNatureza(i) {
   const t = tag(i.natureza || '—', 'natureza', i.natureza);
   t.classList.add('tag-nat', i.natureza === 'técnico' ? 'tec' : 'neg');
+  return t;
+}
+function tagCliente(i) {
+  if (!i.cliente) return document.createTextNode('');
+  const t = tag(i.cliente, 'cliente', i.cliente); t.classList.add('tag-cliente'); t.title = 'Cliente: ' + i.cliente + ' — clique para ver só os itens dele';
   return t;
 }
 function tagOrigem(i) {
@@ -959,11 +977,7 @@ function desenharPaths() {
     b.append(document.createTextNode(rot + ' '), el('span', 'pill' + (n && cls ? ' ' + cls : ''), String(n)));
     b.addEventListener('click', () => alternar('caminho', k)); bd.appendChild(b);
   }
-  const lista = itens();
-  const abertos = lista.filter(aberto).sort((a, b) => new Date(b.atualizado) - new Date(a.atualizado));
-  const fechados = lista.filter((i) => !aberto(i)).sort((a, b) => new Date(b.concluido || b.atualizado) - new Date(a.concluido || a.atualizado));
-  const pintar = (alvo, l) => { alvo.replaceChildren(); if (!l.length) { alvo.appendChild(el('p', 'vazio', 'Nada aqui.')); return; } for (const i of l) { const cx = cartaoItem(i, { comPath: false }); cx.appendChild(desenharPath(i)); alvo.appendChild(cx); } };
-  pintar($('paths-abertos'), abertos); pintar($('paths-fechados'), fechados);
+  // (28/09, G1b) a aba Caminhos saiu: o filtro por caminho fica em Itens e o passo a passo, no detalhe do item
 }
 
 /* ── ABA Novo pedido ──────────────────────────────────────────────────────── */
@@ -1893,6 +1907,7 @@ function desenharReport() {
     { rot: 'Status', valor: (i) => rotuloEstado(i.estado) || i.estado, celula: (i) => tag(rotuloEstado(i.estado) || i.estado, 'estado', i.estado) },
     { rot: 'Quem abriu', valor: (i) => i.quem_abriu || '—', celula: (i) => tag(i.quem_abriu || '—', 'quem', i.quem_abriu) },
     { rot: 'Natureza', valor: (i) => i.natureza, celula: (i) => tagNatureza(i) },
+    { rot: 'Cliente', valor: (i) => i.cliente || 'interno', celula: (i) => i.cliente ? tagCliente(i) : document.createTextNode('interno') },
     { rot: 'Origem', valor: (i) => rotuloOrigem(i.origem) + (i.origem_ref ? ` ${i.origem_ref}` : ''), celula: (i) => tagOrigem(i) },
     { rot: 'Tipo', valor: (i) => rotuloTipo(i.tipo), celula: (i) => tag(rotuloTipo(i.tipo), 'tipo', i.tipo) },
     { rot: 'Passos / desvios', n: 1, valor: (i) => Number((i.caminho || {}).desvios) || 0, texto: (i) => `${num((i.caminho || {}).passos_percorridos)} / ${num((i.caminho || {}).desvios)}` },

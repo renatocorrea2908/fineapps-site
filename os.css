@@ -815,3 +815,14 @@ button.lin:hover { background: var(--sup-3); }
 .tag-origem.o-chamado_bug { color: var(--erro-tinta); border-color: var(--erro-borda) !important; background: var(--erro-suave); }
 .tag-origem.o-chamado_melhoria { color: var(--alerta-tinta); border-color: var(--alerta-borda) !important; background: var(--alerta-suave); }
 .tag-origem.o-pedido_ceo, .tag-origem.o-pergunta_ceo { color: var(--tinta); border-color: var(--tinta-3) !important; }
+
+/* (28/09, G1b) Itens: lista × relatório do período, e o filtro por caminho na mesma tela */
+.modos { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--linha); border-radius: 10px; background: var(--sup-2); margin: 0 0 .9rem; }
+.modos button { border: 0; background: transparent; color: var(--tinta-2); padding: .35rem .8rem; border-radius: 7px; font: inherit; font-size: .9rem; cursor: pointer; }
+.modos button[aria-selected="true"] { background: var(--sup); color: var(--tinta); box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 600; }
+.badges-caminho { align-items: center; margin-top: -.3rem; }
+.badges-caminho .badges-rot { font-size: .8rem; color: var(--tinta-3); text-transform: uppercase; letter-spacing: .04em; margin-right: .2rem; }
+.badges-caminho #badges-paths { display: contents; }
+.badges-caminho .dica { margin-left: auto; font-size: .8rem; color: var(--tinta-3); }
+/* (28/09, M593) o cliente do item */
+.item .meta .tag-cliente, .tabela td .tag-cliente { border: 1px solid var(--linha-2); border-radius: 999px; padding: .02rem .45rem; margin: 0; font-size: .92em; color: var(--tinta); background: var(--sup-3); font-weight: 600; }
