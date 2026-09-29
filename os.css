@@ -549,8 +549,13 @@ button.lin:hover { background: var(--sup-3); }
 .legenda { display: flex; gap: 1rem; font-size: .75rem; color: var(--tinta-2); flex-wrap: wrap; }
 .legenda i { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .3rem; vertical-align: -1px; }
 
+/* os 2 cards principais da aba Custos (OS-186): GitHub Actions encolhido + Custo real lado a lado */
+.topo-custos { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 1.1rem; align-items: stretch; margin: 0 0 1.1rem; }
+.topo-custos .kpi-destaque { grid-template-columns: minmax(0, 1fr); }
+.topo-custos .kpi-destaque .kpi { height: 100%; }
+
 /* o medidor de consumo (M418) — quanto, de quanto, e quão perto do limite */
-.faixa-topo { margin: 0 0 1.1rem; }
+.faixa-topo { margin: 0; }
 .medidor { background: var(--sup); border: 1px solid var(--linha); border-radius: var(--raio); padding: 1.1rem 1.2rem; box-shadow: var(--sombra-1); }
 .medidor + .medidor { margin-top: .6rem; }
 .medidor .cab { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
@@ -620,7 +625,7 @@ button.lin:hover { background: var(--sup-3); }
 /* ─────────────────────────── responsivo ─────────────────────────── */
 .so-movel { display: none; }
 @media (max-width: 1180px) {
-  .grade-custos, .grade-pedido { grid-template-columns: minmax(0, 1fr); }
+  .grade-custos, .grade-pedido, .topo-custos { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 960px) {
   .app { grid-template-columns: minmax(0, 1fr); }
