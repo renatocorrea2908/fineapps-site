@@ -1820,7 +1820,7 @@ function desenharCustos() {
     kr.appendChild(lr);
   }
   // (27/09, CEO) o cartão abre, em fonte menor, o médio do Claude e do GitHub — minutos e dinheiro
-  const km = kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo das rodadas ÷ ${num(itensC.length)} item(ns) · ${rotJ} · CI e robôs ainda não rateados por item`);
+  const km = kpi(k, 'Custo médio por item' + (filtrado ? ' (filtro)' : ''), itensC.length ? moeda(realF / itensC.length) : '—', `custo real dos itens ÷ ${num(itensC.length)} item(ns) · ${rotJ} · fixos e GitHub de todos os workflows rateados (M636)`);
   if (itensC.length) {
     const soma = (f) => itensC.reduce((t, i) => t + Number(i[f] || 0), 0) / itensC.length;
     const lm = el('div', 's lista-fixos');
@@ -1829,10 +1829,19 @@ function desenharCustos() {
     if (daJanela && cu.claude) lm.appendChild(el('span', 'cambio', `Claude nocional (não cobrado): US$ ${Number(cu.claude.usd_nocional || 0).toFixed(2)} na janela`));
     km.appendChild(lm);
   }
+  // (29/09, CEO — OS-187) o que o custo real tem e item nenhum carrega: as rodadas de triagem, council e CTO.
+  //   Sem este card, os cards por item/fila somavam ~R$ 389 abaixo do total e a conta não fechava na tela.
+  const somaItens = (cu.itens || []).reduce((s, i) => s + Number(i.custo_real || 0), 0)
+  const semItem = Math.max(0, Number(cu.custo_real_total || 0) - somaItens)
+  if (!filtrado && Number(cu.custo_real_total)) {
+    const ks = kpi(k, 'Rodadas sem item', moeda(semItem), `triagem, council, CTO… · itens ${moeda(somaItens)} + sem item ${moeda(semItem)} = custo real ${moeda(cu.custo_real_total)}`);
+    const ag = (cu.por_agente || []).filter((a) => !Number(a.itens) && Number(a.custo_real) >= 0.01).sort((a, b) => Number(b.custo_real) - Number(a.custo_real));
+    if (ag.length) { const la = el('div', 's lista-fixos'); for (const a of ag.slice(0, 6)) la.appendChild(el('span', null, `${a.agente}: ${moeda(a.custo_real)} · ${num(a.rodadas)} rodada(s)`)); ks.appendChild(la); }
+  }
   kpi(k, 'Parado esperando você', moeda(c.gasto_parado_esperando_voce), 'consumo já feito em itens travados');
 
   // custo real por item
-  $('sub-custeio').textContent = `${daJanela ? rotJ : cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ''}`;
+  $('sub-custeio').textContent = `${daJanela ? rotJ : cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ` · + ${moeda(semItem)} em rodadas sem item = ${moeda(cu.custo_real_total)}`}`;
   desenharMedias(cu, itensC, filtrado);
   const celEmpresa = (i) => { const f = document.createDocumentFragment(); f.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —')); return f; };
   const nume = (k) => (i) => Number(i[k]) || 0;
@@ -1856,7 +1865,10 @@ function desenharCustos() {
     l.append(el('td', null, f), el('td', 'n', num(dos.length)), el('td', 'n', num(dos.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(dos.reduce((s, i) => s + Number(i.custo_real || 0), 0))), el('td', 'n', dos.length ? moeda(dos.reduce((s, i) => s + Number(i.custo_real || 0), 0) / dos.length) : '—'));
     l.addEventListener('click', () => alternar('fila', f)); t.appendChild(l);
   }
-  const tot = el('tr', 'total'); tot.append(el('td', null, 'Total'), el('td', 'n', num(itensC.length)), el('td', 'n', num(itensC.reduce((s, i) => s + Number(i.rodadas || 0), 0))), el('td', 'n', moeda(realF)), el('td', 'n', itensC.length ? moeda(realF / itensC.length) : '—')); t.appendChild(tot);
+  // (29/09, OS-187) sem filtro, a tabela fecha no custo real: as rodadas sem item entram numa linha própria
+  const rodSemItem = (cu.por_agente || []).filter((a) => !Number(a.itens)).reduce((s, a) => s + Number(a.rodadas || 0), 0)
+  if (!filtrado && semItem > 0) { const ls = el('tr'); ls.append(el('td', null, 'Rodadas sem item (triagem, council, CTO)'), el('td', 'n', '—'), el('td', 'n', num(rodSemItem)), el('td', 'n', moeda(semItem)), el('td', 'n', '—')); t.appendChild(ls); }
+  const tot = el('tr', 'total'); tot.append(el('td', null, 'Total'), el('td', 'n', num(itensC.length)), el('td', 'n', num(itensC.reduce((s, i) => s + Number(i.rodadas || 0), 0) + (!filtrado ? rodSemItem : 0))), el('td', 'n', moeda(realF + (!filtrado ? semItem : 0))), el('td', 'n', itensC.length ? moeda(realF / itensC.length) : '—')); t.appendChild(tot);
   // A mesma soma da tabela, desenhada: uma medida, uma régua, o rótulo no texto.
   const bf = $('barras-filas'); bf.replaceChildren();
   const porFila = filas.map((f) => [f, itensC.filter((i) => i.fila === f).reduce((s, i) => s + Number(i.custo_real || 0), 0)]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
@@ -1876,7 +1888,7 @@ function desenharCustos() {
     pf.append(linha, el('p', 'motivo', f.motivo));
   }
   const totF = el('div', 'atual total-fixos'); totF.append(el('span', null, 'Total'), el('span', null, `${moeda(cu.fixos_brl)}/mês`)); pf.appendChild(totF);
-  pf.appendChild(el('p', 'motivo', `Total: ${moeda(cu.fixos_brl)}/mês. Actions: US$ ${Number(ac.preco_minuto_usd || 0).toFixed(3)}/min além de ${num(ac.franquia)} min. Só os minutos das rodadas do executor entram por item; CI de PR e vigias ficam fora.`));
+  pf.appendChild(el('p', 'motivo', `Total: ${moeda(cu.fixos_brl)}/mês. Actions: US$ ${Number(ac.preco_minuto_usd || 0).toFixed(3)}/min além de ${num(ac.franquia)} min. Desde a M636 os itens e as rodadas sem item rateiam o GitHub de TODOS os workflows (CI, robôs, vigias), do mesmo jeito que os fixos.`));
   const form = el('div', 'acao-caixa');
   const item = chave(el('input'), 'fixo:item'); item.type = 'text'; item.placeholder = 'Contrato (ex.: Vercel Pro)'; item.style.flex = '0 0 11rem';
   const valor = chave(el('input'), 'fixo:valor'); valor.type = 'number'; valor.min = '0'; valor.step = '0.01'; valor.placeholder = 'Valor/mês'; valor.style.flex = '0 0 7rem';
