@@ -18,6 +18,7 @@ const CHAVE_SESSAO = 'fineapps.os.sessao';
 
 let SESSAO = null;
 let RETRATO = null;
+let PEDIDOS_CEO = [];   // (M639, 29/09) pendências do repositório e gaps do John que esperam o SIM do CEO antes da triagem
 let RELOGIO = null;
 // (28/09, G1b) 11 → 8 páginas: Caminhos e Report moram dentro de Itens; os endereços antigos (#paths, #report) levam para lá
 const PAGINAS = ['inicio', 'aprov', 'aceite', 'avisos', 'status', 'filas', 'monitor', 'custos', 'pedido'];
@@ -197,11 +198,13 @@ async function atualizarAgora() {
 //    As duas saem em paralelo: o tempo de tela é o da mais lenta, não a soma.
 let AVISOS = { sem_ciencia: 0, itens: [] }
 async function abrirCasa() {
-  const [retrato, avisos] = await Promise.all([
+  const [retrato, avisos, pedCeo] = await Promise.all([
     rpc('company_os_meu_retrato'),
     rpc('company_os_meus_avisos').catch(() => null),
+    rpc('company_os_pedidos_aguardando_ceo').catch(() => null),   // (M639) antes da triagem: só com o seu sim
   ])
   if (avisos && avisos.itens) AVISOS = avisos
+  PEDIDOS_CEO = Array.isArray(pedCeo) ? pedCeo : []
   if (!retrato || !retrato.estrutura) {
     mostrar($('erro-login'), 'Você entrou, mas esta conta não tem alçada declarada no Company OS. Nada aqui é da sua conta.', false);
     apagarSessao();
@@ -634,21 +637,54 @@ function desenharFicha(f) {
   return d;
 }
 
+/* (M639, 29/09 — decisão do CEO) Pedidos que esperam o SIM antes de qualquer IA: as pendências do repositório do
+   Stratum e, depois, os gaps da pesquisa do John Prod. Aprovar libera — produto vai ao John (especificação e critério
+   de aceite antes de liberar), técnico vai à triagem. Recusar pede o motivo, e o pedido morre ali. */
+function desenharPedidosDoCeo(alvo) {
+  const bloco = el('div', 'pedidos-ceo')
+  bloco.appendChild(el('h3', null, `Esperando o seu sim — antes da triagem (${PEDIDOS_CEO.length})`))
+  bloco.appendChild(el('p', 'dica', 'Nenhuma IA roda nestes pedidos até você decidir. Produto aprovado vai ao John Prod (especificação e critério de aceite antes de liberar); técnico aprovado vai à triagem.'))
+  for (const p of PEDIDOS_CEO) {
+    const cx = el('article', 'item espera'); cx.id = 'pedido-ceo-' + p.id
+    cx.appendChild(el('h4', null, p.titulo))
+    const m = el('div', 'meta')
+    m.appendChild(el('span', 'sit espera', p.rota === 'produto' ? 'produto → John Prod' : p.rota === 'tecnico' ? 'técnico → triagem' : (p.origem || 'pedido')))
+    m.appendChild(el('span', null, `prioridade ${p.prioridade}`))
+    if (p.origem === 'pendencia') m.appendChild(el('span', null, 'pendência do repositório do Stratum'))
+    const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, esperaTexto(Math.floor((Date.now() - Date.parse(p.desde)) / 86400000)))); m.appendChild(dir)
+    cx.appendChild(m)
+    const det = el('details'); det.appendChild(el('summary', null, 'Ler o pedido inteiro')); const pre = el('div', 'texto-pedido'); pre.textContent = p.descricao || ''; pre.style.whiteSpace = 'pre-wrap'; det.appendChild(pre); cx.appendChild(det)
+    const acao = el('div', 'acao-caixa')
+    const mot = el('input'); mot.type = 'text'; mot.placeholder = 'Nota (obrigatória para recusar, 10+ letras)'
+    const bS = el('button', 'btn', 'Aprovar'); const bN = el('button', 'btn sec', 'Recusar'); const msg = el('p', 'aviso'); msg.hidden = true
+    const decidir = async (d) => {
+      bS.disabled = bN.disabled = true
+      try { await rpc('company_os_decidir_pedido', { p_request: p.id, p_decisao: d, p_motivo: mot.value.trim() || null }); toast(d === 'aprovar' ? (p.rota === 'produto' ? 'Aprovado — vai ao John Prod.' : 'Aprovado — vai à triagem.') : 'Recusado.'); await abrirCasa() }
+      catch (err) { mostrar(msg, String(err.message || err), false); bS.disabled = bN.disabled = false }
+    }
+    bS.addEventListener('click', () => decidir('aprovar')); bN.addEventListener('click', () => decidir('recusar'))
+    acao.append(mot, bS, bN, msg); cx.appendChild(acao)
+    bloco.appendChild(cx)
+  }
+  alvo.appendChild(bloco)
+}
+
 function desenharCaixa(modo) {
   const ehAceite = modo === 'aceite';
   const porId = new Map(todosItens().map((i) => [i.id, i]));
   const daPagina = ((RETRATO.inbox && RETRATO.inbox.itens) || []).filter((p) => eAceite(p) === ehAceite);
   const lista = daPagina.filter((p) => { const i = porId.get(p.id); return !i || passa(i); });
-  const total = daPagina.length;
+  const total = daPagina.length + (ehAceite ? 0 : PEDIDOS_CEO.length);
   const pill = $('pill-' + modo);
   pill.textContent = String(total); pill.hidden = !total;
   pill.className = 'pill' + (total ? (ehAceite ? ' ambar' : ' vermelho') : '');
   const limpo = ehAceite ? 'Nenhuma entrega espera o seu aceite. O que é técnico, a régua (CI) e o CTO aceitam sozinhos.' : 'Nada espera a sua alçada. A fila anda sozinha.';
   $('sub-' + modo).textContent = lista.length === 0
-    ? (total ? 'Nada com os filtros atuais.' : limpo)
+    ? (!ehAceite && PEDIDOS_CEO.length && !daPagina.length ? `${PEDIDOS_CEO.length} pedido(s) esperam o seu sim antes da triagem. Nenhum item de trabalho espera a sua alçada.` : total ? 'Nada com os filtros atuais.' : limpo)
     : ehAceite ? `${lista.length} entrega(s) prontas que só fecham com o seu aceite (ou recusa com motivo). As mais antigas primeiro.`
                : `${lista.length} item(ns) não começam até você decidir. As mais antigas primeiro.`;
   const alvo = $('lista-' + modo); alvo.replaceChildren();
+  if (!ehAceite && PEDIDOS_CEO.length) desenharPedidosDoCeo(alvo);
   // (M472/D6) o que já subiu e ainda não tem a ficha: você vê que existe, mas só decide com a ficha
   const prep = (((RETRATO.inbox && RETRATO.inbox.em_preparo) || {}).itens || []).filter((x) => (x.classe === 'entrega_aguarda_aceite') === ehAceite);
   if (prep.length) {
@@ -656,7 +692,7 @@ function desenharCaixa(modo) {
     f.appendChild(el('span', null, `${num(prep.length)} decisão(ões) em preparo: a Triagem está escrevendo a ficha de uma página. ${prep.length === 1 ? 'Ela chega' : 'Elas chegam'} aqui quando estiver${prep.length === 1 ? '' : 'em'} completa${prep.length === 1 ? '' : 's'}.`));
     f.title = prep.map((x) => x.titulo).join('\n'); alvo.appendChild(f);
   }
-  if (!lista.length) alvo.appendChild(vazioGrande(ehAceite ? 'Aceitações limpas' : 'Aprovações limpas', total ? 'Nada com os filtros atuais.' : limpo));
+  if (!lista.length && (ehAceite || !PEDIDOS_CEO.length)) alvo.appendChild(vazioGrande(ehAceite ? 'Aceitações limpas' : 'Aprovações limpas', total ? 'Nada com os filtros atuais.' : limpo));
   for (const p of lista) {
     const i = porId.get(p.id);
     const cx = el('article', 'item ' + (Number(p.dias_esperando) >= 2 ? 'urgente' : 'espera'));
@@ -2050,7 +2086,7 @@ function desenharInicio() {
   const k = $('kpis-inicio'); k.replaceChildren();
   const aprovs = (inbox.itens || []).filter((x) => !eAceite(x)); const aceites = (inbox.itens || []).filter(eAceite);
   const antiga = (l) => Math.max(0, ...l.map((x) => Number(x.dias_esperando) || 0));
-  kpi(k, 'Aprovações', num(aprovs.length), aprovs.length ? `pode ir? · a mais antiga ${esperaTexto(antiga(aprovs))}` : 'nada espera a sua alçada', aprovs.length ? (antiga(aprovs) >= 2 ? 'atencao' : 'alerta') : 'ok', () => irPara('aprov'), false, 'aprovar');
+  kpi(k, 'Aprovações', num(aprovs.length + PEDIDOS_CEO.length), aprovs.length ? `pode ir? · a mais antiga ${esperaTexto(antiga(aprovs))}${PEDIDOS_CEO.length ? ` · + ${PEDIDOS_CEO.length} pedido(s) antes da triagem` : ''}` : PEDIDOS_CEO.length ? `${PEDIDOS_CEO.length} pedido(s) esperam o seu sim antes da triagem` : 'nada espera a sua alçada', aprovs.length ? (antiga(aprovs) >= 2 ? 'atencao' : 'alerta') : PEDIDOS_CEO.length ? 'alerta' : 'ok', () => irPara('aprov'), false, 'aprovar');
   kpi(k, 'Aceitações', num(aceites.length), aceites.length ? `ficou bom? · a mais antiga ${esperaTexto(antiga(aceites))}` : 'nenhuma entrega espera você', aceites.length ? (antiga(aceites) >= 2 ? 'atencao' : 'alerta') : 'ok', () => irPara('aceite'), false, 'aceite');
   kpi(k, 'Avisos sem ciência', num(novos.length), novos.length ? 'nada aqui pede decisão' : 'fila limpa', novos.length ? 'alerta' : 'ok', () => irPara('avisos'), false, 'sino');
   // (26/09) "Em execução" saiu dos números: o cartão Executor agora, logo abaixo, diz o mesmo com o item e a hora.
