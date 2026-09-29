@@ -1753,6 +1753,18 @@ const NOME_WORKFLOW = {
 // (27/09, CEO) "já temos GitHub nas rodadas dos agentes. Quero outra dessa para workflow, para CI, etc."
 // Um card por origem, no MESMO formato e na MESMA fileira do card dos agentes (M557, medido run a run).
 const CARD_ORIGEM = { ci: 'GitHub no CI', robos: 'GitHub nos robôs de aceite e merge', rotinas: 'GitHub nas vigias e rotinas', outros_repos: 'GitHub no site e outros repositórios', outros: 'GitHub em outros workflows' };
+// (OS-188, 29/09, CEO) "abaixo dos minutos consumidos, o custo em fonte de igual tamanho; a composição
+// some e só aparece no hover" — os minutos e o custo competiam por espaço com a explicação o tempo todo.
+// Reaproveita a classe 'v' para o custo (mesma fonte do valor principal) e esconde a composição
+// (percentual + a lista de workflows, quando existir) até o mouse passar sobre o card.
+function kpiMinCusto(alvo, rot, minTxt, custoTxt, compTxt, cls) {
+  const d = kpi(alvo, rot, minTxt, null, cls);
+  d.classList.add('kpi-custo-hover');
+  d.appendChild(el('div', 'v v-custo' + (String(custoTxt).length > 7 ? ' longo' : ''), custoTxt));
+  const comp = el('div', 'composicao', compTxt);
+  d.appendChild(comp);
+  return comp;
+}
 function kpisGithubPorOrigem(k, daJanela) {
   const jg = dadosDaJanela('company_os_meus_minutos_github', 'custos', () => desenharCustos());
   if (!jg) return;   // a porta ainda não respondeu: o desenho volta quando ela chegar
@@ -1766,13 +1778,13 @@ function kpisGithubPorOrigem(k, daJanela) {
     const c = g.categorias.find((x) => x.categoria === cat);
     if (!c && cat !== 'ci' && cat !== 'robos' && cat !== 'rotinas') continue;   // origem sem uso na janela não vira card
     const min = c ? Number(c.minutos) : 0;
-    const d = kpi(k, CARD_ORIGEM[cat] + (daJanela ? ' (janela)' : ''), `${num(min)} min`,
-      `${total ? pctTxt(Math.round(1000 * min / total) / 10) : '—'} dos minutos · ${moeda(c ? c.brl : 0)} pagos (além da franquia)`,
+    const comp = kpiMinCusto(k, CARD_ORIGEM[cat] + (daJanela ? ' (janela)' : ''), `${num(min)} min`, moeda(c ? c.brl : 0),
+      `${total ? pctTxt(Math.round(1000 * min / total) / 10) : '—'} dos minutos pagos (além da franquia)`,
       cat === 'ci' && total && min / total > 0.5 ? 'atencao' : 'ok');
     if (c && (c.workflows || []).length) {
       const lw = el('div', 's lista-fixos');
       for (const w of c.workflows.slice(0, 6)) lw.appendChild(el('span', null, `${NOME_WORKFLOW[w.workflow] || w.nome || w.workflow}${cat === 'outros_repos' ? ' (' + w.repo + ')' : ''}: ${num(w.minutos)} min · ${num(w.runs)} execuç${Number(w.runs) === 1 ? 'ão' : 'ões'}`));
-      d.appendChild(lw);
+      comp.appendChild(lw);
     }
   }
 }
@@ -1815,8 +1827,10 @@ function desenharCustos() {
   // (M621, pedido do CEO 662fe1ae) o card dos agentes lê a MESMA medição run a run dos outros cards (franquia uma vez só);
   // o medidor por rodada dava a franquia inteira aos agentes. Sem a M621 no banco, cai no número antigo.
   const gtAg = cu.github_todos && Array.isArray(cu.github_todos.categorias) ? cu.github_todos.categorias.find((x) => x.categoria === 'agentes') : null;
-  if (gtAg) kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Number(gtAg.minutos))} min`, `${Number(cu.github_todos.minutos) ? pctTxt(Math.round(1000 * Number(gtAg.minutos) / Number(cu.github_todos.minutos)) / 10) : '—'} dos minutos · ${moeda(gtAg.brl)} pagos (além da franquia)`, Number(gtAg.brl) > 0 ? 'atencao' : 'ok');
-  else kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
+  if (gtAg) kpiMinCusto(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Number(gtAg.minutos))} min`, moeda(gtAg.brl),
+    `${Number(cu.github_todos.minutos) ? pctTxt(Math.round(1000 * Number(gtAg.minutos) / Number(cu.github_todos.minutos)) / 10) : '—'} dos minutos pagos (além da franquia)`, Number(gtAg.brl) > 0 ? 'atencao' : 'ok');
+  else kpiMinCusto(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? moeda(ac.excedente_brl) : moeda(0),
+    Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos além da franquia` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
   kpisGithubPorOrigem(k, daJanela);
   // (M621) custo real = fixos + o GitHub PAGO de TODOS os workflows (rodadas, CI, robôs, vigias) — a conta do CEO fecha no card
   // (OS-186) este é o 2º card principal — sobe para junto do GitHub Actions, fora da fila de kpis
