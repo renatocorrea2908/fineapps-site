@@ -1520,6 +1520,14 @@ const NOME_AGENTE = { 'executor-actions': 'Executor (Oficina)', 'council-actions
   triagem: 'Triagem', 'triagem-divisao': 'Triagem — divisão', 'cto-decisao': 'CTO — decisão do time', 'cto-conferencia': 'CTO — conferência de entrega',
   ficha: 'Ficha de decisão', 'cto-capacidade': 'CTO — relatório de capacidade', merge: 'Merge (conclusão)', 'aceite-ci': 'Aceite Técnico (CI)' };
 let MEDIA_POR = 'squad';
+// (29/09, CEO) o que o custo real tem e item nenhum carrega (triagem, council, CTO): sem ele, toda quebra por item
+//   (fila, produto, cliente, squad, a tabela por item) soma abaixo do total. Sem filtro, entra como linha própria.
+function semItemDo(cu) {
+  const somaItens = (cu.itens || []).reduce((s, i) => s + Number(i.custo_real || 0), 0)
+  const custo = Math.max(0, Number(cu.custo_real_total || 0) - somaItens)
+  const rodadas = cu.triagem ? Number(cu.triagem.rodadas || 0) : (cu.por_agente || []).filter((a) => !Number(a.itens)).reduce((s, a) => s + Number(a.rodadas || 0), 0)
+  return { custo, rodadas, somaItens, rotulo: 'Rodadas sem item (triagem, council, CTO)' }
+}
 function desenharMedias(cu, itensC, filtrado) {
   const alvo = $('medias-por'); if (!alvo) return;
   const sel = $('medias-seletor'); sel.replaceChildren();
@@ -1537,6 +1545,8 @@ function desenharMedias(cu, itensC, filtrado) {
     const g = new Map();
     for (const i of itensC) { const k = chaveDe(i); const x = g.get(k) || { grupo: k, itens: 0, rodadas: 0, custo: 0 }; x.itens++; x.rodadas += Number(i.rodadas) || 0; x.custo += Number(i.custo_real) || 0; g.set(k, x); }
     linhasM = [...g.values()];
+    const si = semItemDo(cu)
+    if (!filtrado && si.custo >= 0.01) linhasM.push({ grupo: si.rotulo, itens: 0, rodadas: si.rodadas, custo: si.custo })
   }
   const rot = dims.find(([k]) => k === MEDIA_POR)[1];
   tabelaExcel('medias-por', [
@@ -1843,17 +1853,17 @@ function desenharCustos() {
   // custo real por item
   $('sub-custeio').textContent = `${daJanela ? rotJ : cu.mes ? new Date(String(cu.mes).slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : ''} · ${num(itensC.length)} item(ns)${filtrado ? ' (com filtro)' : ` · + ${moeda(semItem)} em rodadas sem item = ${moeda(cu.custo_real_total)}`}`;
   desenharMedias(cu, itensC, filtrado);
-  const celEmpresa = (i) => { const f = document.createDocumentFragment(); f.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —')); return f; };
+  const celEmpresa = (i) => { if (i.semItem) return document.createTextNode('—'); const f = document.createDocumentFragment(); f.append(tag(i.empresa, 'empresa', i.empresa), document.createTextNode(' / '), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —')); return f; };
   const nume = (k) => (i) => Number(i[k]) || 0;
   tabelaExcel('custeio-itens', [
-    { rot: 'Item', valor: (i) => `${(todosItens().find((x) => x.id === i.id) || {}).codigo || ''} ${i.titulo}`, celula: (i) => { const cod = (todosItens().find((x) => x.id === i.id) || {}).codigo; const b = el('button', 'btn-texto', (cod ? cod + ' · ' : '') + i.titulo); if (todosItens().some((x) => x.id === i.id)) b.addEventListener('click', () => abrirGaveta(i.id)); return b; } },
-    { rot: 'Fila', valor: (i) => i.fila, celula: (i) => tag(i.fila, 'fila', i.fila) },
+    { rot: 'Item', valor: (i) => `${(todosItens().find((x) => x.id === i.id) || {}).codigo || ''} ${i.titulo}`, celula: (i) => { if (i.semItem) return el('span', null, i.titulo); const cod = (todosItens().find((x) => x.id === i.id) || {}).codigo; const b = el('button', 'btn-texto', (cod ? cod + ' · ' : '') + i.titulo); if (todosItens().some((x) => x.id === i.id)) b.addEventListener('click', () => abrirGaveta(i.id)); return b; } },
+    { rot: 'Fila', valor: (i) => i.fila, celula: (i) => (i.semItem ? document.createTextNode('—') : tag(i.fila, 'fila', i.fila)) },
     { rot: 'Empresa / produto', valor: (i) => `${i.empresa} / ${i.produto || 'sem produto'}`, celula: celEmpresa },
     { rot: 'Rodadas', n: 1, valor: nume('rodadas'), texto: (i) => num(i.rodadas) },
-    { rot: 'Fixos rateados', n: 1, valor: nume('fixos_rateados'), texto: (i) => moeda(i.fixos_rateados), somar: moeda },
-    { rot: 'Actions', n: 1, valor: nume('actions_brl'), texto: (i) => moeda(i.actions_brl), somar: moeda },
+    { rot: 'Fixos rateados', n: 1, valor: nume('fixos_rateados'), texto: (i) => (i.semItem ? '—' : moeda(i.fixos_rateados)), somar: moeda },
+    { rot: 'Actions', n: 1, valor: nume('actions_brl'), texto: (i) => (i.semItem ? '—' : moeda(i.actions_brl)), somar: moeda },
     { rot: 'Custo real', n: 1, valor: nume('custo_real'), texto: (i) => moeda(i.custo_real), somar: moeda },
-  ], itensC, { barra: 'barra-custeio', unidade: 'item(ns)' });
+  ], (() => { const si = semItemDo(cu); return !filtrado && si.custo >= 0.01 ? [...itensC, { id: null, titulo: si.rotulo, fila: '—', empresa: '—', produto: '—', rodadas: si.rodadas, fixos_rateados: null, actions_brl: null, custo_real: si.custo, semItem: true }] : itensC })(), { barra: 'barra-custeio', unidade: 'linha(s)' });
 
   // por fila (custo real)
   const filas = (RETRATO.estrutura.filas || []).map((f) => f.nome);
