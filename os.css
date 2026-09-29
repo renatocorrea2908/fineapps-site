@@ -741,6 +741,7 @@ button.lin:hover { background: var(--sup-3); }
   padding: .6rem .7rem; font-size: .76rem; color: var(--tinta-3); text-align: left;
 }
 .kpi.kpi-custo-hover:hover .composicao, .kpi.kpi-custo-hover:focus-within .composicao { display: flex; flex-direction: column; gap: .35rem; }
+.kpi.kpi-custo-hover .composicao .cambio { color: var(--tinta-3); opacity: .8; }
 /* (M473) os robôs do GitHub, um bloco por robô, com o próprio interruptor */
 .robo { padding: .85rem 0; border-top: 1px solid var(--linha); }
 .robo:first-child { border-top: 0; padding-top: 0; }

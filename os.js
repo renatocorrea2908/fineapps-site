@@ -1758,9 +1758,15 @@ const CARD_ORIGEM = { ci: 'GitHub no CI', robos: 'GitHub nos robôs de aceite e 
 // Reaproveita a classe 'v' para o custo (mesma fonte do valor principal) e esconde a composição
 // (percentual + a lista de workflows, quando existir) até o mouse passar sobre o card.
 function kpiMinCusto(alvo, rot, minTxt, custoTxt, compTxt, cls) {
+  // (OS-188, 29/09, CEO — 2ª rodada) "o custo não está destacado como pedi": minutos e custo
+  // decidiam o encolhimento ('.longo') cada um pelo PRÓPRIO tamanho — um comprido e o outro
+  // curto saíam em fontes diferentes. A decisão passa a ser conjunta: os dois usam a MESMA
+  // classe, então saem sempre do mesmo tamanho (o clamp de '.longo' já reage à largura do card).
+  const longo = String(minTxt).length > 7 || String(custoTxt).length > 7;
   const d = kpi(alvo, rot, minTxt, null, cls);
+  d.querySelector(':scope > .v').classList.toggle('longo', longo);
   d.classList.add('kpi-custo-hover');
-  d.appendChild(el('div', 'v v-custo' + (String(custoTxt).length > 7 ? ' longo' : ''), custoTxt));
+  d.appendChild(el('div', 'v v-custo' + (longo ? ' longo' : ''), custoTxt));
   const comp = el('div', 'composicao', compTxt);
   d.appendChild(comp);
   return comp;
@@ -1819,8 +1825,10 @@ function desenharCustos() {
   const k = $('kpis-custos'); k.replaceChildren();
   const kdest = $('kpi-custo-real'); kdest.replaceChildren();
   // (26/09, CEO) o card diz QUAIS são os contratos e quanto cada um vale — a lista miúda cabe no próprio card
+  // (OS-188, 29/09, CEO — 2ª rodada) a composição some por padrão e só aparece no hover, igual aos cards do GitHub
   const kf = kpi(k, daJanela ? 'Custos fixos na janela' : 'Custo fixo do mês', moeda(cu.fixos_brl), null);
-  const lf = el('div', 's lista-fixos');
+  kf.classList.add('kpi-custo-hover');
+  const lf = el('div', 'composicao');
   for (const f of (cu.fixos || [])) lf.appendChild(el('span', null, `${f.item}: ${f.moeda === 'USD' ? 'US$ ' + Number(f.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ' = ' : ''}${moeda(f.valor_brl)}/mês${f.na_janela_brl != null ? ' · na janela ' + moeda(f.na_janela_brl) : ''}`));
   if (Number(cu.cambio)) lf.appendChild(el('span', 'cambio', `câmbio ${Number(cu.cambio).toFixed(2).replace('.', ',')}`));
   kf.appendChild(lf);
