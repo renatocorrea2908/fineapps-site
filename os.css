@@ -842,3 +842,6 @@ button.lin:hover { background: var(--sup-3); }
 .badges-caminho .dica { margin-left: auto; font-size: .8rem; color: var(--tinta-3); }
 /* (28/09, M593) o cliente do item */
 .item .meta .tag-cliente, .tabela td .tag-cliente { border: 1px solid var(--linha-2); border-radius: 999px; padding: .02rem .45rem; margin: 0; font-size: .92em; color: var(--tinta); background: var(--sup-3); font-weight: 600; }
+
+/* (29/09) a prévia da entrega é o 1º gesto do aceite: botão de verdade, separado do link do código */
+a.btn.previa { text-decoration: none; display: inline-flex; align-items: center; gap: .4rem; margin: 0 1rem .6rem 0; }

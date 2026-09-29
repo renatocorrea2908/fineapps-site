@@ -746,15 +746,20 @@ function desenharCaixa(modo) {
     }
     if (p.classe === 'entrega_aguarda_aceite') {
       const ref = (p.contexto && p.contexto.referencia) || '';
-      if (/^https?:\/\//.test(ref)) { const a = el('a', 'ligacao', 'Abrir a entrega (PR) em nova aba'); a.appendChild(icone('externo')); a.href = ref; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
+      // (29/09, CEO: "como eu ia aceitar se não vi como a tela ficaria?") a PRÉVIA do Vercel vem primeiro: aceitar é olhar
+      const detalhe = String((p.contexto && p.contexto.detalhe) || '');
+      const previa = previaDaEntrega(ref, detalhe, p.id);
+      if (previa) { const a = el('a', 'btn previa', 'Ver como ficou (prévia)'); a.appendChild(icone('externo')); a.href = previa; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
+      if (/^https?:\/\//.test(ref)) { const a = el('a', 'ligacao', previa ? 'Ver o código (PR)' : 'Abrir a entrega (PR) em nova aba'); a.appendChild(icone('externo')); a.href = ref; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
       else if (ref) cx.appendChild(el('p', 'porque', 'Evidência: ' + ref));
-      if (p.contexto && p.contexto.detalhe) cx.appendChild(el('p', 'porque', p.contexto.detalhe));
+      const semLink = detalhe.replace(/\s*Ver como ficou \(prévia\):\s*\S+/, '').trim();
+      if (semLink) cx.appendChild(el('p', 'porque', semLink));
       cx.appendChild(caixaAcao(p, [['Aceitar entrega', 'company_os_aceitar_entrega', 'p_observacao'], ['Recusar', 'company_os_recusar_entrega', 'p_motivo', null, 'perigo']],
         'Observação (para aceitar) ou motivo (para recusar) — mínimo 10 letras'));
     }
     if (p.classe === 'travado') cx.appendChild(caixaAcao(p, [['Devolver à fila', 'company_os_devolver_a_fila', 'p_motivo'], ['Cancelar item', 'company_os_cancelar_item', 'p_motivo', null, 'perigo']],
       'O que mudou (para devolver) ou por que encerrar (para cancelar) — mínimo 10 letras'));
-    if (p.classe === 'deliberacao_escalada') cx.appendChild(el('p', 'porque', 'Deliberação escalada: a decisão é registrada pela Triagem com a sua palavra. Escreva a decisão num pedido novo ou fale com o executor.'));
+    if (p.classe === 'deliberacao_escalada') cx.appendChild(caixaEscalada(p));
     alvo.appendChild(cx);
   }
   // Só para você saber: o que a régua (CI) aceitou nos últimos 7 dias — informação, não pendência (M397).
@@ -782,6 +787,46 @@ function desenharCaixa(modo) {
     }
   }
 }
+/* (M640/D-31) a deliberação escalada a você — a mesa antes do código, ou outra — se decide AQUI, no card: as posições
+   de cada cadeira à vista, e a sua decisão por escrito. Na mesa do item, decidir devolve o item à fila sozinho. */
+/* a prévia publicada pelo Vercel para o PR: a que o `entregar` escreveu no texto, ou — entregas anteriores — a do
+   endereço da branch do item (os/<8 primeiros do id>), no padrão que o vercel[bot] publica no PR. Só site e Stratum. */
+function previaDaEntrega(ref, detalhe, itemId) {
+  const m = String(detalhe || '').match(/Ver como ficou \(prévia\):\s*(https:\/\/\S+)/);
+  if (m) return m[1];
+  const pr = String(ref || '').match(/github\.com\/renatocorrea2908\/(stratum|fineapps-site)\/pull\/\d+/);
+  if (!pr || !itemId) return null;
+  return `https://${pr[1]}-git-os-${String(itemId).slice(0, 8).toLowerCase()}-fineapps.vercel.app${pr[1] === 'fineapps-site' ? '/os' : ''}`;
+}
+
+function caixaEscalada(p) {
+  const cx = el('div', 'acao-caixa');
+  const topo = el('div'); topo.append(el('div', 'ficha-rot', 'A decisão'), el('div', 'ficha-pergunta', p.porque || p.titulo));
+  cx.appendChild(topo);
+  const pos = ((p.contexto || {}).posicoes || []);
+  if (pos.length) {
+    const d = el('details'); d.appendChild(el('summary', null, `O que cada cadeira disse (${pos.length})`));
+    for (const x of pos) d.appendChild(el('p', 'porque', `${x.sustenta ? '✓ sustenta' : '✗ não sustenta'} — ${x.agente}: ${x.posicao}`));
+    cx.appendChild(d);
+  }
+  const campo = chave(el('textarea'), 'escalada:' + p.id); campo.rows = 3;
+  campo.placeholder = 'A sua decisão, por escrito (mínimo 10 letras) — é o que o executor vai seguir';
+  campo.setAttribute('aria-label', campo.placeholder);
+  const msg = el('p', 'aviso'); msg.hidden = true; msg.setAttribute('role', 'alert');
+  const b = el('button', 'btn', 'Decidir');
+  b.addEventListener('click', async () => {
+    b.disabled = true;
+    try {
+      await rpc('company_os_decidir_escalada', { p_deliberacao_id: p.id, p_decisao: campo.value.trim() });
+      campo.value = '';
+      await abrirCasa();
+      toast('Decisão registrada — o item volta à fila.');
+    } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; }
+  });
+  cx.append(campo, b, msg);
+  return cx;
+}
+
 function caixaAcao(p, botoes, placeholder) {
   const cx = el('div', 'acao-caixa');
   const campo = chave(el('input'), 'acao:' + p.id); campo.type = 'text'; campo.placeholder = placeholder; campo.setAttribute('aria-label', placeholder);
@@ -1998,6 +2043,10 @@ function desenharReport() {
     return true;
   }).sort((a, b) => new Date(b[base]) - new Date(a[base]));
   const k = $('kpis-report'); k.replaceChildren();
+  // (M641) a tela carrega todo item aberto + os criados ou mexidos nos últimos 90 dias — e diz isso quando o período pede antes
+  const desde = RETRATO.itens_desde ? new Date(RETRATO.itens_desde) : null;
+  const avAnt = document.getElementById('aviso-itens-desde'); if (avAnt) avAnt.remove();
+  if (desde && (!de || de < desde)) { const av = el('p', 'aviso', `A tela carrega os itens criados ou mexidos desde ${desde.toLocaleDateString('pt-BR')} (e todo item aberto). Antes disso, os números ficam de fora.`); av.id = 'aviso-itens-desde'; k.before(av); }
   kpi(k, 'Itens no período', num(lista.length), `por ${$('r-base').selectedOptions[0].textContent.toLowerCase()}`);
   kpi(k, 'Concluídos', num(lista.filter((i) => i.estado === 'done').length), `${num(lista.filter((i) => i.estado === 'done' && i.tem_prova).length)} com prova`, 'ok');
   kpi(k, 'Parados / travados', num(lista.filter((i) => aberto(i) && pendente(i)).length), 'precisam de você', lista.some((i) => aberto(i) && pendente(i)) ? 'atencao' : '');
