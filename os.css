@@ -731,6 +731,17 @@ button.lin:hover { background: var(--sup-3); }
 /* (26/09) o card de custo fixo lista os contratos em fonte miúda */
 .kpi .s.lista-fixos { display: flex; flex-direction: column; gap: .05rem; white-space: normal; font-size: .72rem; line-height: 1.35; margin-top: .25rem; }
 .kpi .s.lista-fixos .cambio { color: var(--tinta-3); opacity: .8; }
+/* (OS-188, 29/09, CEO) minutos + custo na mesma fonte (a classe é a mesma 'v'); a composição
+   (percentual e, quando existir, a lista de workflows) só aparece ao passar o mouse sobre o card. */
+.kpi.kpi-custo-hover { overflow: visible; }
+.kpi.kpi-custo-hover .v.v-custo { margin-top: 0; }
+.kpi.kpi-custo-hover .composicao {
+  display: none; position: absolute; left: -1px; right: -1px; top: calc(100% + .4rem); z-index: 5;
+  background: var(--sup); border: 1px solid var(--linha-2); border-radius: var(--raio); box-shadow: var(--sombra-2);
+  padding: .6rem .7rem; font-size: .76rem; color: var(--tinta-3); text-align: left;
+}
+.kpi.kpi-custo-hover:hover .composicao, .kpi.kpi-custo-hover:focus-within .composicao { display: flex; flex-direction: column; gap: .35rem; }
+.kpi.kpi-custo-hover .composicao .cambio { color: var(--tinta-3); opacity: .8; }
 /* (M473) os robôs do GitHub, um bloco por robô, com o próprio interruptor */
 .robo { padding: .85rem 0; border-top: 1px solid var(--linha); }
 .robo:first-child { border-top: 0; padding-top: 0; }
