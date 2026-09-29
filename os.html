@@ -325,8 +325,13 @@
       <!-- CUSTOS -->
       <section class="aba" data-aba="custos" hidden>
         <!-- M418 — o medidor de consumo, antes dos números do mês: ele responde
-             "quanto falta para o limite", que é a pergunta que vem primeiro. -->
-        <div id="medidor-consumo" class="faixa-topo"></div>
+             "quanto falta para o limite", que é a pergunta que vem primeiro.
+             OS-186 — os 2 cards principais (GitHub Actions + Custo real na janela)
+             ficam lado a lado aqui em cima; o resto desce para kpis-custos. -->
+        <div class="topo-custos">
+          <div id="medidor-consumo" class="faixa-topo"></div>
+          <div class="kpis kpi-destaque" id="kpi-custo-real"></div>
+        </div>
         <div class="janela" id="janela-custos"></div>
         <div class="kpis" id="kpis-custos"></div>
         <div class="grade-custos topo-espaco">

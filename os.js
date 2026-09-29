@@ -1795,6 +1795,7 @@ function desenharCustos() {
   const minutosF = itensC.reduce((s, i) => s + Number(i.minutos || 0), 0);
   const ac = cu.actions || {};
   const k = $('kpis-custos'); k.replaceChildren();
+  const kdest = $('kpi-custo-real'); kdest.replaceChildren();
   // (26/09, CEO) o card diz QUAIS são os contratos e quanto cada um vale — a lista miúda cabe no próprio card
   const kf = kpi(k, daJanela ? 'Custos fixos na janela' : 'Custo fixo do mês', moeda(cu.fixos_brl), null);
   const lf = el('div', 's lista-fixos');
@@ -1808,8 +1809,9 @@ function desenharCustos() {
   else kpi(k, daJanela ? 'GitHub nas rodadas dos agentes (janela)' : 'GitHub nas rodadas dos agentes', `${num(Math.round(cu.minutos_total || 0))} min`, Number(ac.minutos_excedentes) > 0 ? `${num(Math.round(ac.minutos_excedentes))} min pagos (além da franquia) = ${moeda(ac.excedente_brl)}` : `franquia de ${num(ac.franquia)} min`, Number(ac.minutos_excedentes) > 0 ? 'atencao' : 'ok');
   kpisGithubPorOrigem(k, daJanela);
   // (M621) custo real = fixos + o GitHub PAGO de TODOS os workflows (rodadas, CI, robôs, vigias) — a conta do CEO fecha no card
+  // (OS-186) este é o 2º card principal — sobe para junto do GitHub Actions, fora da fila de kpis
   const gt = cu.github_todos || null;
-  const kr = kpi(k, daJanela ? 'Custo real na janela' : 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : daJanela ? rotJ : cu.provisorio ? 'fixos + GitHub de todos os workflows · provisório até o mês fechar' : 'mês fechado');
+  const kr = kpi(kdest, daJanela ? 'Custo real na janela' : 'Custo real do mês', moeda(cu.custo_real_total), filtrado ? `${moeda(realF)} nos itens do filtro` : daJanela ? rotJ : cu.provisorio ? 'fixos + GitHub de todos os workflows · provisório até o mês fechar' : 'mês fechado');
   if (gt) {
     const lr = el('div', 's lista-fixos');
     lr.appendChild(el('span', null, `Fixos: ${moeda(cu.fixos_brl)}`));
