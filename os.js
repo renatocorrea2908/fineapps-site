@@ -2104,17 +2104,3 @@ function render() {
 
 aplicarTema(temaEscolhido());
 boot();
-
-
-// (29/09/2026) "Aguardando prova": a situação sai da data de conferência, no fuso de Brasília
-;(function situacaoDasProvas() {
-  const hoje = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-  hoje.setHours(0, 0, 0, 0)
-  document.querySelectorAll('#tabela-provas tbody tr[data-conferir]').forEach((tr) => {
-    const [a, m, d] = tr.dataset.conferir.split('-').map(Number)
-    const dias = Math.round((new Date(a, m - 1, d) - hoje) / 86400000)
-    const cel = tr.lastElementChild
-    cel.textContent = dias > 1 ? `aguardando — faltam ${dias} dias` : dias === 1 ? 'aguardando — amanhã' : dias === 0 ? 'conferir hoje' : `conferir — venceu há ${-dias} dia(s)`
-    if (dias <= 0) cel.style.fontWeight = '650'
-  })
-})()
