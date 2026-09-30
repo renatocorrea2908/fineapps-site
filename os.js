@@ -667,7 +667,7 @@ function desenharPedidosDoCeo(alvo, pedidos = PEDIDOS_CEO) {
     const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, esperaTexto(Math.floor((Date.now() - Date.parse(p.desde)) / 86400000)))); m.appendChild(dir)
     cx.appendChild(m)
     if (p.parecer_do_john) { const pj = el('div'); pj.append(el('div', 'ficha-rot', 'O John devolveu a você'), el('div', 'ficha-pergunta', p.parecer_do_john)); cx.appendChild(pj) }
-    const det = el('details'); det.appendChild(el('summary', null, 'Ler o pedido inteiro')); const pre = el('div', 'texto-pedido'); pre.textContent = p.descricao || ''; pre.style.whiteSpace = 'pre-wrap'; det.appendChild(pre); cx.appendChild(det)
+    const det = chave(el('details'), 'det:pedido-ceo:' + p.id); det.appendChild(el('summary', null, 'Ler o pedido inteiro')); const pre = el('div', 'texto-pedido'); pre.textContent = p.descricao || ''; pre.style.whiteSpace = 'pre-wrap'; det.appendChild(pre); cx.appendChild(det)
     if (MESA_EXEC) cx.appendChild(blocoPergunta(p.id))   // (M650) perguntar antes de decidir
     const acao = el('div', 'acao-caixa')
     const mot = el('input'); mot.type = 'text'; mot.placeholder = 'Nota (obrigatória para recusar, 10+ letras)'
@@ -689,7 +689,7 @@ function desenharPedidosDoCeo(alvo, pedidos = PEDIDOS_CEO) {
 function desenharComOJohn(alvo) {
   const b = COM_O_JOHN
   if (!b || (!b.pedidos.length && !(b.liberados_7d || []).length)) return
-  const d = el('details', 'com-o-john'); d.open = false
+  const d = chave(el('details', 'com-o-john'), 'det:com-o-john'); d.open = false
   const esperando = b.pedidos.filter((x) => !x.especificado).length, naFila = b.pedidos.filter((x) => x.especificado).length
   d.appendChild(el('summary', null, `Com o John Prod — ${esperando} para especificar · ${naFila} esperando vaga · ${(b.liberados_7d || []).length} liberado(s) em 7 dias`))
   d.appendChild(el('p', 'dica', `Ele prioriza, escreve a especificação e o critério de aceite; a casa libera na ordem dele, até ${b.teto_por_squad_semana} por squad por semana, sem IA.`))
@@ -948,7 +948,7 @@ function caixaEscalada(p) {
   cx.appendChild(topo);
   const pos = ((p.contexto || {}).posicoes || []);
   if (pos.length) {
-    const d = el('details'); d.appendChild(el('summary', null, `O que cada cadeira disse (${pos.length})`));
+    const d = chave(el('details'), 'det:cadeiras:' + p.id); d.appendChild(el('summary', null, `O que cada cadeira disse (${pos.length})`));
     for (const x of pos) d.appendChild(el('p', 'porque', `${x.sustenta ? '✓ sustenta' : '✗ não sustenta'} — ${x.agente}: ${x.posicao}`));
     cx.appendChild(d);
   }
