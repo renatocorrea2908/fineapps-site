@@ -409,7 +409,10 @@ const TITULOS = {
 };
 function irPara(aba) { if (PAGINAS_ANTIGAS[aba]) { MODO_ITENS = PAGINAS_ANTIGAS[aba][1]; aba = PAGINAS_ANTIGAS[aba][0]; } if (!PAGINAS.includes(aba)) return; ABA = aba; if (GAVETA) { GAVETA = null; desenharGaveta(); } mostrarAba(); window.scrollTo({ top: 0 }); }
 document.addEventListener('click', (e) => {
-  const b = e.target.closest('[data-aba]:not(section)'); if (b) { irPara(b.dataset.aba); return; }
+  // (30/09) sub-item do menu lateral: a página já aberta no executivo
+  const ex = e.target.closest('[data-exec-nav]');
+  if (ex) { const [pg, k] = ex.dataset.execNav.split(':'); gravarExecSel(pg, k); irPara(pg); if (pg === 'aprov') desenharCaixa('aprov'); else desenharAvisos(); desenharNavExec(); return; }
+  const b = e.target.closest('[data-aba]:not(section)'); if (b) { if (b.dataset.aba === 'aprov' || b.dataset.aba === 'avisos') { gravarExecSel(b.dataset.aba, 'todos'); } irPara(b.dataset.aba); if (b.dataset.aba === 'aprov' && MESA_EXEC) desenharCaixa('aprov'); if (b.dataset.aba === 'avisos' && MESA_EXEC) desenharAvisos(); return; }
   const ir = e.target.closest('[data-ir]'); if (ir) irPara(ir.dataset.ir);
 });
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (PAGINAS_ANTIGAS[h]) { irPara(h); return; } if (PAGINAS.includes(h) && h !== ABA) { ABA = h; mostrarAba(); } });
@@ -423,6 +426,7 @@ function mostrarAba() {
   $('titulo-pagina').textContent = t; $('sub-pagina').textContent = sub;
   document.title = `${t} — Command Center`;
   if (location.hash.slice(1) !== ABA) history.replaceState(null, '', '#' + ABA);
+  desenharNavExec();
   fecharMenu();
 }
 function abrirMenu() { $('lateral').classList.add('aberta'); $('veu').hidden = false; }
@@ -608,7 +612,7 @@ const ROTULO_CLASSE = { aguarda_alcada: 'aguarda a sua alçada', deliberacao_esc
    fecha com o seu aceite) moravam na mesma lista — e o CEO lia tudo como
    "está vindo para o meu aceite". A caixa é a mesma do banco; a tela só separa. */
 const eAceite = (p) => p.classe === 'entrega_aguarda_aceite';
-function desenharAprov() { desenharCaixa('aprov'); desenharCaixa('aceite'); }
+function desenharAprov() { desenharCaixa('aprov'); desenharCaixa('aceite'); desenharNavExec(); }
 /* ── A FICHA DE UMA PÁGINA (M472/D6) ──────────────────────────────────────
    O que o CEO lê antes de decidir: a pergunta, o negócio, a recomendação de
    cada executivo e custo/prazo DA CASA (calculados pelo banco, não por quem
@@ -652,24 +656,25 @@ function desenharFicha(f) {
 function desenharPedidosDoCeo(alvo, pedidos = PEDIDOS_CEO) {
   const bloco = el('div', 'pedidos-ceo')
   bloco.appendChild(el('h3', null, `Esperando o seu sim — antes da triagem (${pedidos.length})`))
-  bloco.appendChild(el('p', 'dica', 'Nenhuma IA roda nestes pedidos até você decidir. Produto aprovado vai ao John Prod (especificação e critério de aceite antes de liberar); técnico aprovado vai à triagem.'))
+  bloco.appendChild(el('p', 'dica', 'Nenhuma IA roda nestes pedidos até você decidir. Produto aprovado vai ao John Prod (especificação e critério de aceite antes de liberar); peça de Marketing aprovada vira item da fila de Marketing; técnico aprovado vai à triagem.'))
   for (const p of pedidos) {
     const cx = el('article', 'item espera'); cx.id = 'pedido-ceo-' + p.id
     cx.appendChild(el('h4', null, p.titulo))
     const m = el('div', 'meta')
-    m.appendChild(el('span', 'sit espera', p.rota === 'produto' ? 'produto → John Prod' : p.rota === 'tecnico' ? 'técnico → triagem' : (p.origem || 'pedido')))
+    m.appendChild(el('span', 'sit espera', p.rota === 'produto' ? 'produto → John Prod' : p.rota === 'tecnico' ? 'técnico → triagem' : p.rota === 'marketing' ? 'peça de Marketing (com aval do CFO) → fila de Marketing' : (p.origem || 'pedido')))
     m.appendChild(el('span', null, `prioridade ${p.prioridade}`))
     if (p.origem === 'pendencia') m.appendChild(el('span', null, 'pendência do repositório do Stratum'))
     const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, esperaTexto(Math.floor((Date.now() - Date.parse(p.desde)) / 86400000)))); m.appendChild(dir)
     cx.appendChild(m)
     if (p.parecer_do_john) { const pj = el('div'); pj.append(el('div', 'ficha-rot', 'O John devolveu a você'), el('div', 'ficha-pergunta', p.parecer_do_john)); cx.appendChild(pj) }
     const det = el('details'); det.appendChild(el('summary', null, 'Ler o pedido inteiro')); const pre = el('div', 'texto-pedido'); pre.textContent = p.descricao || ''; pre.style.whiteSpace = 'pre-wrap'; det.appendChild(pre); cx.appendChild(det)
+    if (MESA_EXEC) cx.appendChild(blocoPergunta(p.id))   // (M650) perguntar antes de decidir
     const acao = el('div', 'acao-caixa')
     const mot = el('input'); mot.type = 'text'; mot.placeholder = 'Nota (obrigatória para recusar, 10+ letras)'
     const bS = el('button', 'btn', 'Aprovar'); const bN = el('button', 'btn sec', 'Recusar'); const msg = el('p', 'aviso'); msg.hidden = true
     const decidir = async (d) => {
       bS.disabled = bN.disabled = true
-      try { await rpc('company_os_decidir_pedido', { p_request: p.id, p_decisao: d, p_motivo: mot.value.trim() || null }); toast(d === 'aprovar' ? (p.rota === 'produto' ? 'Aprovado — vai ao John Prod.' : 'Aprovado — vai à triagem.') : 'Recusado.'); await abrirCasa() }
+      try { await rpc('company_os_decidir_pedido', { p_request: p.id, p_decisao: d, p_motivo: mot.value.trim() || null }); toast(d === 'aprovar' ? (p.rota === 'produto' ? 'Aprovado — vai ao John Prod.' : p.rota === 'marketing' ? 'Aprovado — vira item da fila de Marketing.' : 'Aprovado — vai à triagem.') : 'Recusado.'); await abrirCasa() }
       catch (err) { mostrar(msg, String(err.message || err), false); bS.disabled = bN.disabled = false }
     }
     bS.addEventListener('click', () => decidir('aprovar')); bN.addEventListener('click', () => decidir('recusar'))
@@ -761,6 +766,7 @@ function cartaoPendencia(p, i) {
     cx.appendChild(caixaAcao(p, [['Aceitar entrega', 'company_os_aceitar_entrega', 'p_observacao'], ['Recusar', 'company_os_recusar_entrega', 'p_motivo', null, 'perigo']],
       'Observação (para aceitar) ou motivo (para recusar) — mínimo 10 letras'));
   }
+  if ((p.classe === 'travado' || p.classe === 'deliberacao_escalada') && MESA_EXEC) cx.appendChild(blocoPergunta(p.id));   // (M650)
   if (p.classe === 'travado') cx.appendChild(caixaAcao(p, [['Devolver à fila', 'company_os_devolver_a_fila', 'p_motivo'], ['Cancelar item', 'company_os_cancelar_item', 'p_motivo', null, 'perigo']],
     'O que mudou (para devolver) ou por que encerrar (para cancelar) — mínimo 10 letras'));
   if (p.classe === 'deliberacao_escalada') cx.appendChild(caixaEscalada(p));
@@ -777,7 +783,7 @@ function barraExec(pagina, contagem, redesenhar) {
   for (const [k, rot, n] of opcoes) {
     const bt = el('button', 'badge' + (n ? '' : ' zero')); bt.type = 'button'; bt.setAttribute('aria-pressed', String(EXEC_SEL[pagina] === k));
     bt.append(document.createTextNode(rot + ' '), el('span', 'pill' + (n && k !== 'todos' ? ' vermelho' : ''), String(n)));
-    bt.addEventListener('click', () => { gravarExecSel(pagina, k); redesenhar(); });
+    bt.addEventListener('click', () => { gravarExecSel(pagina, k); redesenhar(); desenharNavExec(); });
     b.appendChild(bt);
   }
   return b;
@@ -787,6 +793,40 @@ function secaoExec(x, n) {
   const h = el('h3', 'exec-titulo'); h.append(el('b', null, x.cargo), document.createTextNode(' — ' + x.nome), el('span', 'exec-n', n ? ` · ${n} com você` : ' · nada agora'));
   sec.appendChild(h);
   return sec;
+}
+/* (30/09, CEO: "quero essa quebra dos executivos nos menus laterais") abaixo de Aprovações e de Avisos, um sub-item
+   por executivo com o que espera você; clicar abre a página já no executivo. As contas são as mesmas da barra. */
+function contagemExec(pagina) {
+  const c = {}; if (!MESA_EXEC) return c;
+  for (const x of MESA_EXEC.executivos) c[x.chave] = 0;
+  if (pagina === 'aprov') {
+    const porId = new Map(todosItens().map((i) => [i.id, i]));
+    const lista = ((RETRATO && RETRATO.inbox && RETRATO.inbox.itens) || []).filter((p) => !eAceite(p)).filter((p) => { const i = porId.get(p.id); return !i || passa(i); });
+    for (const p of PEDIDOS_CEO) c[execDe('pedidos', p.id)] = (c[execDe('pedidos', p.id)] || 0) + 1;
+    for (const p of lista) c[execDe('pendencias', p.id)] = (c[execDe('pendencias', p.id)] || 0) + 1;
+  } else {
+    for (const a of (AVISOS.itens || []).filter((a) => !a.visto_em)) c[execDe('avisos', a.id)] = (c[execDe('avisos', a.id)] || 0) + 1;
+  }
+  return c;
+}
+function desenharNavExec() {
+  for (const pagina of ['aprov', 'avisos']) {
+    const botao = document.querySelector(`#abas button[data-aba="${pagina}"]`); if (!botao) continue;
+    let sub = document.getElementById('nav-sub-' + pagina);
+    if (!MESA_EXEC) { if (sub) sub.remove(); continue; }
+    if (!sub) { sub = el('div', 'nav-sub'); sub.id = 'nav-sub-' + pagina; botao.after(sub); }
+    sub.replaceChildren();
+    const c = contagemExec(pagina);
+    for (const x of MESA_EXEC.executivos) {
+      const b = el('button', 'nav-sub-item'); b.type = 'button'; b.dataset.execNav = pagina + ':' + x.chave;
+      b.title = `${x.cargo} — ${x.nome}`;
+      b.setAttribute('aria-selected', String(ABA === pagina && EXEC_SEL[pagina] === x.chave));
+      b.append(el('span', 'nav-sub-cargo', x.cargo), el('span', 'nav-sub-nome', x.nome));
+      const n = c[x.chave] || 0;
+      if (n) b.appendChild(el('span', 'pill' + (pagina === 'aprov' ? ' vermelho' : ' ambar'), String(n)));
+      sub.appendChild(b);
+    }
+  }
 }
 function desenharPorExecutivo(alvo, lista, porId) {
   const sel = EXEC_SEL.aprov;
@@ -873,6 +913,33 @@ function previaDaEntrega(ref, detalhe, itemId) {
   const pr = String(ref || '').match(/github\.com\/renatocorrea2908\/(stratum|fineapps-site)\/pull\/\d+/);
   if (!pr || !itemId) return null;
   return `https://${pr[1]}-git-os-${String(itemId).slice(0, 8).toLowerCase()}-fineapps.vercel.app${pr[1] === 'fineapps-site' ? '/os' : ''}`;
+}
+
+/* (M650, 30/09 — CEO: "falta um botão de perguntar; às vezes quero saber mais antes de aprovar ou reprovar")
+   Vale para o pedido que espera o sim, o item travado e a deliberação escalada. A pergunta vai ao COO / CTO com o
+   contexto da coisa; a resposta aparece AQUI no card e também nos Avisos. */
+function blocoPergunta(ref) {
+  const d = el('div', 'pergunta-mesa');
+  const q = MESA_EXEC && MESA_EXEC.perguntas && MESA_EXEC.perguntas[ref];
+  if (q) {
+    d.appendChild(el('p', 'porque', `Você perguntou${q.em ? ' em ' + quando(q.em) : ''}: “${q.texto}”`));
+    if (q.resposta) d.appendChild(el('p', 'porque resposta', `Resposta${q.respondida_em ? ' em ' + quando(q.respondida_em) : ''}: ${q.resposta}`));
+    else if (q.estado === 'cancelled') d.appendChild(el('p', 'dica', 'A pergunta foi cancelada — pode perguntar de novo.'));
+    else { d.appendChild(el('p', 'dica', 'Aguardando a resposta do COO / CTO — ela aparece aqui e nos Avisos.')); return d; }
+  }
+  const linha = el('div', 'acao-caixa');
+  const campo = chave(el('input'), 'perg-mesa:' + ref); campo.type = 'text';
+  campo.placeholder = q ? 'Outra pergunta antes de decidir (mínimo 10 letras)' : 'Perguntar antes de decidir (mínimo 10 letras)';
+  campo.setAttribute('aria-label', campo.placeholder);
+  const b = el('button', 'btn sec', 'Perguntar'); const msg = el('p', 'aviso'); msg.hidden = true; msg.setAttribute('role', 'alert');
+  b.addEventListener('click', async () => {
+    if (campo.value.trim().length < 10) { mostrar(msg, 'Escreva a pergunta (mínimo 10 letras).', false); return; }
+    b.disabled = true;
+    try { await rpc('company_os_perguntar_antes_de_decidir', { p_ref: ref, p_pergunta: campo.value.trim() }); campo.value = ''; toast('Pergunta enviada ao COO / CTO — a resposta volta aqui.'); await abrirCasa(); }
+    catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; }
+  });
+  linha.append(campo, b, msg); d.appendChild(linha);
+  return d;
 }
 
 function caixaEscalada(p) {

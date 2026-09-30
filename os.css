@@ -857,3 +857,16 @@ details.com-o-john .linha-john { padding: .35rem 0; border-top: 1px solid var(--
 .exec-titulo { margin: .4rem 0 .1rem; padding-bottom: .45rem; border-bottom: 1px solid var(--linha-2); font-size: 1rem; font-weight: 550; color: var(--tinta-2); }
 .exec-titulo b { color: var(--tinta); font-weight: 700; }
 .exec-titulo .exec-n { color: var(--tinta-3); font-weight: 500; font-size: .85rem; }
+
+/* (30/09) menu lateral: um sub-item por executivo em Aprovações e Avisos */
+.nav .nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 0 0 .25rem 1.55rem; padding-left: .45rem; border-left: 1px solid var(--linha-2); }
+.nav .nav-sub-item { padding: .28rem .5rem; gap: .45rem; font-size: .8rem; font-weight: 500; }
+.nav .nav-sub-cargo { font-weight: 650; color: var(--tinta-2); min-width: 4.6rem; }
+.nav .nav-sub-nome { flex: 1; color: var(--tinta-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav .nav-sub-item[aria-selected="true"] .nav-sub-cargo, .nav .nav-sub-item[aria-selected="true"] .nav-sub-nome { color: var(--marca-tinta); }
+.nav .nav-sub-item .pill { font-size: .7rem; }
+/* (M650) perguntar antes de decidir — em pedido, travado e deliberação */
+.item .pergunta-mesa { margin-top: .75rem; padding: .6rem .85rem; border-radius: var(--raio-p); background: var(--sup-2); border: 1px solid var(--linha); }
+.item .pergunta-mesa .porque:first-child { margin-top: 0; }
+.item .pergunta-mesa .resposta { color: var(--tinta); }
+.item .pergunta-mesa .acao-caixa { margin-top: .4rem; }
