@@ -65,6 +65,9 @@
       <p class="nav-grupo">Saúde e dinheiro</p>
       <button data-aba="monitor"><span data-icone="pulso"></span><span class="nav-rot">Monitor</span><span class="pill" id="pill-monitor" hidden></span><kbd>7</kbd></button>
       <button data-aba="custos"><span data-icone="dinheiro"></span><span class="nav-rot">Custos</span><span class="pill" id="pill-custos" hidden></span><kbd>8</kbd></button>
+
+      <p class="nav-grupo">Comercial</p>
+      <button data-aba="marketing" title="Os números do Stratum, os posts e as fontes do Phill (D-33)"><span data-icone="megafone"></span><span class="nav-rot">Marketing</span></button>
     </nav>
 
     <div class="lateral-pe">
@@ -313,6 +316,24 @@
       </section>
 
       <!-- CUSTOS -->
+      <!-- M653/D-33 (30/09) — as fontes de dado comercial do Phill: os números do produto, os posts do CEO, o site que espera ser nosso -->
+      <section class="aba" data-aba="marketing" hidden>
+        <p class="dica" id="mkt-medido"></p>
+        <div class="kpis" id="kpis-mkt"></div>
+        <div class="grade-custos topo-espaco">
+          <div class="cartao">
+            <div class="cartao-cab"><h2>Posts publicados</h2><span class="dica" id="mkt-posts-90d"></span></div>
+            <p class="dica">Registre cada post do LinkedIn ou do Instagram com os números que a rede mostra. Colar o mesmo link de novo atualiza os números — o Phill lê tudo em cada rodada.</p>
+            <div class="tabela-envolve"><table class="tabela" id="mkt-posts"></table></div>
+            <div id="mkt-form"></div>
+          </div>
+          <div class="cartao">
+            <div class="cartao-cab"><h2>O que o Phill lê</h2></div>
+            <div id="mkt-fontes" class="painel-teto"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="aba" data-aba="custos" hidden>
         <!-- M418 — o medidor de consumo, antes dos números do mês: ele responde
              "quanto falta para o limite", que é a pergunta que vem primeiro.

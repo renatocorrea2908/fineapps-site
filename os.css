@@ -874,3 +874,11 @@ details.com-o-john .linha-john { padding: .35rem 0; border-top: 1px solid var(--
 .nav .nav-toggle:hover { background: var(--sup-3); color: var(--tinta); }
 .nav .nav-toggle.fechado { transform: rotate(-90deg); }
 .nav .nav-sub[hidden] { display: none; }
+
+/* (M653/D-33, 30/09) Marketing — o estado de cada fonte do Phill */
+#mkt-fontes .selo { padding: .12rem .5rem; border-radius: 999px; font-weight: 650; font-size: .72rem; }
+#mkt-fontes .selo.bom { background: var(--ok-suave); color: var(--ok-tinta); }
+#mkt-fontes .selo.atencao { background: var(--alerta-suave); color: var(--alerta-tinta); }
+#mkt-fontes .selo.neutro { border: 1px solid currentColor; opacity: .7; }
+#mkt-posts a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+#mkt-form .acao-caixa input, #mkt-form .acao-caixa select { flex: 1 1 10rem; }

@@ -23,10 +23,11 @@ let MESA_EXEC = null;   // (M649, 30/09 — CEO) quem é o executivo de cada avi
 const EXEC_SEL = { aprov: lerExecSel('aprov'), avisos: lerExecSel('avisos') };
 function lerExecSel(p) { try { return localStorage.getItem('os-exec-' + p) || 'todos'; } catch { return 'todos'; } }
 function gravarExecSel(p, v) { EXEC_SEL[p] = v; try { localStorage.setItem('os-exec-' + p, v); } catch { /* só nesta aba */ } }
+let MARKETING = null;   // (M653/D-33, 30/09) as fontes de dado comercial do Phill: números do produto, posts, site
 let PEDIDOS_CEO = [];   // (M639, 29/09) pendências do repositório e gaps do John que esperam o SIM do CEO antes da triagem
 let RELOGIO = null;
 // (28/09, G1b) 11 → 8 páginas: Caminhos e Report moram dentro de Itens; os endereços antigos (#paths, #report) levam para lá
-const PAGINAS = ['inicio', 'aprov', 'aceite', 'avisos', 'status', 'filas', 'monitor', 'custos', 'pedido'];
+const PAGINAS = ['inicio', 'aprov', 'aceite', 'avisos', 'status', 'filas', 'monitor', 'custos', 'pedido', 'marketing'];
 const PAGINAS_ANTIGAS = { paths: ['status', 'lista'], report: ['status', 'relatorio'] };
 let MODO_ITENS = 'lista';
 let ABA = PAGINAS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'inicio';
@@ -59,6 +60,7 @@ const ICONES = {
   dinheiro: 'M12 2v20M17 5.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
   grafico: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
   mais: 'M12 5v14M5 12h14',
+  megafone: 'M3 11v3a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13',
   sol: circ(12, 12, 4) + 'M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4',
   lua: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z',
   tela: 'M3 4h18v12H3zM8 20h8M12 16v4',
@@ -203,13 +205,15 @@ async function atualizarAgora() {
 //    As duas saem em paralelo: o tempo de tela é o da mais lenta, não a soma.
 let AVISOS = { sem_ciencia: 0, itens: [] }
 async function abrirCasa() {
-  const [retrato, avisos, pedCeo, john, mesaExec] = await Promise.all([
+  const [retrato, avisos, pedCeo, john, mesaExec, mkt] = await Promise.all([
     rpc('company_os_meu_retrato'),
     rpc('company_os_meus_avisos').catch(() => null),
     rpc('company_os_pedidos_aguardando_ceo').catch(() => null),   // (M639) antes da triagem: só com o seu sim
     rpc('company_os_com_o_john').catch(() => null),               // (M644) o que está com o John
     rpc('company_os_minha_mesa_por_executivo').catch(() => null), // (M649) o executivo de cada coisa
+    rpc('company_os_marketing_na_tela').catch(() => null),        // (M653) a página Marketing
   ])
+  MARKETING = mkt && Array.isArray(mkt.fontes) ? mkt : null
   MESA_EXEC = mesaExec && Array.isArray(mesaExec.executivos) && mesaExec.executivos.length ? mesaExec : null
   COM_O_JOHN = john && Array.isArray(john.pedidos) ? john : null
   if (avisos && avisos.itens) AVISOS = avisos
@@ -406,6 +410,7 @@ const TITULOS = {
   monitor: ['Monitor', 'As réguas do sistema, as rampas de autonomia e o executor'],
   custos: ['Custos', 'Quanto você paga, quanto falta para o limite e onde foi parar'],
   pedido: ['Novo pedido', 'Entra assinado por você; a Triagem classifica e roteia'],
+  marketing: ['Marketing', 'Os números do Stratum, os posts que você publicou e o que o Phill lê'],
 };
 function irPara(aba) { if (PAGINAS_ANTIGAS[aba]) { MODO_ITENS = PAGINAS_ANTIGAS[aba][1]; aba = PAGINAS_ANTIGAS[aba][0]; } if (!PAGINAS.includes(aba)) return; ABA = aba; if (GAVETA) { GAVETA = null; desenharGaveta(); } mostrarAba(); window.scrollTo({ top: 0 }); }
 document.addEventListener('click', (e) => {
@@ -2403,13 +2408,84 @@ function desenharInicio() {
 }
 
 /* ── render geral ─────────────────────────────────────────────────────────── */
+/* ── Marketing (M653/D-33, 30/09) ───────────────────────────────────────────
+   O CEO escolheu as fontes do Phill: 1. os números do próprio Stratum (o OS lê a produção a cada 15 min, um retrato por
+   dia); 2. o site (espera sair da GoDaddy); 3. os posts do LinkedIn/Instagram, registrados aqui. Nenhum número nasce na
+   tela: o banco calcula; aqui só se mostra e se registra o post. */
+const REDES = { linkedin: 'LinkedIn', instagram: 'Instagram', outra: 'Outra' };
+const FONTES = { produto: 'Números do Stratum', site: 'Site', redes: 'LinkedIn e Instagram', conversas: 'Conversas por e-mail' };
+const ESTADO_FONTE = { ativa: ['Lendo', 'bom'], aguardando: ['Aguardando', 'atencao'], fora: ['Fora', 'neutro'] };
+function desenharMarketing() {
+  const k = $('kpis-mkt'); if (!k) return;
+  k.replaceChildren(); $('mkt-fontes').replaceChildren(); $('mkt-posts').replaceChildren(); $('mkt-form').replaceChildren();
+  if (!MARKETING) { k.appendChild(el('p', 'vazio', 'A página Marketing ainda não respondeu (a migration 653 entra pelo pipeline do OS).')); return; }
+  const n = (MARKETING.numeros && MARKETING.numeros.atual) || null;
+  const a30 = (MARKETING.numeros && MARKETING.numeros.ha_30_dias) || null;
+  const dif = (campo) => (a30 ? (() => { const d = Number(n[campo]) - Number(a30[campo]); return d === 0 ? 'igual há 30 dias' : `${d > 0 ? '+' : ''}${num(d)} em 30 dias`; })() : 'série começa hoje');
+  $('mkt-medido').textContent = n ? `Stratum em produção — retrato de ${dia(n.dia + 'T12:00:00')}, medido às ${hhmm(n.medido_em)}. Receita pela tabela de preço dos planos das organizações com assinatura.` : 'O primeiro retrato do produto chega na próxima busca (a cada 15 min).';
+  if (n) {
+    kpi(k, 'Clientes pagantes', num(n.pagantes), dif('pagantes'));
+    kpi(k, 'Em teste grátis', num(n.em_teste), dif('em_teste'));
+    kpi(k, 'Organizações ativas', num(n.orgs_ativas), `${num(n.novas_30d)} nova(s) · ${num(n.encerradas_30d)} encerrada(s) em 30 dias`);
+    kpi(k, 'Receita mensal', moeda(n.receita_mensal_brl), dif('receita_mensal_brl'));
+    kpi(k, 'Usuários ativos', num(n.usuarios_ativos), dif('usuarios_ativos'));
+  }
+  const cp = MARKETING.custo_do_phill; if (cp) kpi(k, 'Custo do Marketing', moeda(cp.brl), `de ${moeda(cp.teto_brl)} no mês · ${num(cp.rodadas)} rodada(s)`);
+
+  // o que o Phill lê
+  const fo = $('mkt-fontes');
+  for (const f of MARKETING.fontes) {
+    const [rot, cls] = ESTADO_FONTE[f.estado] || [f.estado, 'neutro'];
+    const cab = el('div', 'atual'); cab.append(el('span', null, FONTES[f.fonte] || f.fonte), el('span', 'selo ' + cls, rot));
+    fo.append(cab, el('p', 'motivo', f.como_se_mede));
+    if (f.falta) fo.appendChild(el('p', 'motivo', 'Falta: ' + f.falta));
+  }
+
+  // os posts
+  const p90 = MARKETING.posts_90d || {};
+  $('mkt-posts-90d').textContent = `90 dias: ${num(p90.posts)} post(s) · alcance ${num(p90.alcance)} · ${num(p90.reacoes)} reações · ${num(p90.cliques)} cliques`;
+  const t = $('mkt-posts');
+  const cab = el('tr'); for (const h of ['Data', 'Rede', 'Post', 'Alcance', 'Reações', 'Coment.', 'Cliques']) cab.appendChild(el('th', ['Alcance', 'Reações', 'Coment.', 'Cliques'].includes(h) ? 'n' : null, h)); t.appendChild(cab);
+  const vazio = (v) => (v == null ? '—' : num(v));
+  for (const x of (MARKETING.posts || [])) {
+    const tr = el('tr'); const td = el('td'); const lk = el('a', null, x.titulo); lk.href = x.link; lk.target = '_blank'; lk.rel = 'noopener noreferrer'; td.appendChild(lk);
+    tr.append(el('td', null, dia(x.publicado_em + 'T12:00:00')), el('td', null, REDES[x.rede] || x.rede), td, el('td', 'n', vazio(x.alcance)), el('td', 'n', vazio(x.reacoes)), el('td', 'n', vazio(x.comentarios)), el('td', 'n', vazio(x.cliques)));
+    t.appendChild(tr);
+  }
+  if (!(MARKETING.posts || []).length) { const tr = el('tr'); const td = el('td', 'vazio', 'Nenhum post registrado ainda.'); td.colSpan = 7; tr.appendChild(td); t.appendChild(tr); }
+
+  // registrar / atualizar um post
+  const form = el('div', 'acao-caixa');
+  const rede = chave(el('select'), 'mkt:rede'); for (const [v, r] of Object.entries(REDES)) { const o = el('option', null, r); o.value = v; rede.appendChild(o); } rede.style.flex = '0 0 8rem';
+  const link = chave(el('input'), 'mkt:link'); link.type = 'url'; link.placeholder = 'Link do post (https://…)';
+  const data = chave(el('input'), 'mkt:data'); data.type = 'date'; data.style.flex = '0 0 9rem'; if (!data.value) data.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const titulo = chave(el('input'), 'mkt:titulo'); titulo.type = 'text'; titulo.placeholder = 'Assunto do post';
+  const campos = {};
+  for (const [c, r] of [['alcance', 'Alcance'], ['impressoes', 'Impressões'], ['reacoes', 'Reações'], ['comentarios', 'Comentários'], ['compartilhamentos', 'Compart.'], ['cliques', 'Cliques']]) {
+    const i = chave(el('input'), 'mkt:' + c); i.type = 'number'; i.min = '0'; i.step = '1'; i.placeholder = r; i.title = r; i.style.flex = '1 1 7.5rem'; campos[c] = i;
+  }
+  const b = el('button', 'btn sec', 'Registrar post'); const msg = el('p', 'aviso'); msg.hidden = true;
+  b.addEventListener('click', async () => {
+    b.disabled = true;
+    const corpo = { rede: rede.value, link: link.value.trim(), publicado_em: data.value, titulo: titulo.value.trim() };
+    for (const [c, i] of Object.entries(campos)) if (i.value !== '') corpo[c] = Number(i.value);
+    try {
+      const r = await rpc('company_os_registrar_post', { p: corpo });
+      link.value = ''; titulo.value = ''; for (const i of Object.values(campos)) i.value = '';
+      await abrirCasa(); toast(r && r.novo ? 'Post registrado — o Phill lê na próxima rodada.' : 'Números do post atualizados.');
+    } catch (err) { mostrar(msg, String(err.message || err), false); b.disabled = false; }
+  });
+  form.append(rede, link, data, titulo, ...Object.values(campos), b, msg);
+  const det = chave(el('details'), 'det:mkt-post'); det.appendChild(el('summary', null, 'Registrar um post ou atualizar os números…')); det.appendChild(form); $('mkt-form').appendChild(det);
+}
+
 function render() {
   if (!RETRATO) return;
   const estado = $('app').hidden ? null : guardarEstado();
   NA_CAIXA = new Map(((RETRATO.inbox && RETRATO.inbox.itens) || []).map((p) => [p.id, p.classe]));
   desenharChips(); montarSeletores();
   desenharAprov(); desenharStatus(); desenharOrg(); desenharPaths();
-  desenharPedido(); desenharAvisos(); desenharMonitor(); desenharCustos(); desenharReport();
+  desenharPedido(); desenharAvisos(); desenharMonitor(); desenharCustos(); desenharReport(); desenharMarketing();
   desenharInicio(); desenharGaveta();
   mostrarAba();
   if (estado) restaurarEstado(estado);
