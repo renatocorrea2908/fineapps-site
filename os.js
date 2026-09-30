@@ -1106,11 +1106,19 @@ $('form-pedido').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = $('btn-pedido'); btn.disabled = true; $('msg-pedido').hidden = true;
   try {
-    await rpc('company_os_abrir_pedido', {
-      p_titulo: $('p-titulo').value.trim(), p_descricao: $('p-desc').value.trim(), p_prioridade: $('p-prio').value,
-      p_empresa: $('p-empresa').value, p_produto: $('p-produto').value || null,
-    });
-    mostrar($('msg-pedido'), 'Pedido aberto e assinado por você. A Triagem classifica e roteia em instantes; ele aparece em Itens assim que virar item.', true);
+    if ($('p-para').value === 'phill') {
+      // (M648/D-32) pedido direto ao Phill Mark: acorda a rodada dele; a resposta chega nos Avisos
+      await rpc('company_os_pedir_ao_phill', {
+        p_titulo: $('p-titulo').value.trim(), p_texto: $('p-desc').value.trim(), p_prioridade: $('p-prio').value,
+      });
+      mostrar($('msg-pedido'), 'Pedido entregue ao Phill Mark. Ele trata na próxima rodada (em minutos) e responde nos Avisos; o que precisar de produção volta para as suas Aprovações.', true);
+    } else {
+      await rpc('company_os_abrir_pedido', {
+        p_titulo: $('p-titulo').value.trim(), p_descricao: $('p-desc').value.trim(), p_prioridade: $('p-prio').value,
+        p_empresa: $('p-empresa').value, p_produto: $('p-produto').value || null,
+      });
+      mostrar($('msg-pedido'), 'Pedido aberto e assinado por você. A Triagem classifica e roteia em instantes; ele aparece em Itens assim que virar item.', true);
+    }
     toast('Pedido aberto.');
     $('p-titulo').value = ''; $('p-desc').value = '';
     await abrirCasa();
