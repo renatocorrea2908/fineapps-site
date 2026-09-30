@@ -8,6 +8,11 @@
 <title>Command Center — FineApps</title>
 <link rel="icon" href="img/simbolo-claro.png" media="(prefers-color-scheme: light)">
 <link rel="icon" href="img/simbolo-escuro.png" media="(prefers-color-scheme: dark)">
+<!-- App instalado (Chrome/Edge no Mac e no Windows): sem manifesto, o ícone do Dock/barra de tarefas saía do
+     favicon (retangular e transparente) e ficava em branco. Ícones quadrados a partir do logo oficial do OS. -->
+<link rel="manifest" href="/os.webmanifest">
+<link rel="apple-touch-icon" href="img/os-apple-touch.png">
+<meta name="theme-color" content="#000714">
 <!-- O tema é decidido ANTES da primeira pintura (sem piscar branco no escuro).
      Arquivo próprio porque o CSP desta rota é script-src 'self' — nada inline. -->
 <script src="os-tema.js"></script>
