@@ -850,3 +850,10 @@ a.btn.previa { text-decoration: none; display: inline-flex; align-items: center;
 details.com-o-john { margin: 1rem 0; padding: .75rem 1rem; border: 1px solid var(--linha-2); border-radius: var(--raio-p, 8px); }
 details.com-o-john summary { cursor: pointer; font-weight: 600; }
 details.com-o-john .linha-john { padding: .35rem 0; border-top: 1px solid var(--linha); }
+
+/* (M649, 30/09) Avisos e Aprovações por executivo — um de cada vez, como em reunião */
+.exec-barra { margin: 0 0 1rem; }
+.exec-secao { display: flex; flex-direction: column; gap: .75rem; margin: 0 0 1.6rem; }
+.exec-titulo { margin: .4rem 0 .1rem; padding-bottom: .45rem; border-bottom: 1px solid var(--linha-2); font-size: 1rem; font-weight: 550; color: var(--tinta-2); }
+.exec-titulo b { color: var(--tinta); font-weight: 700; }
+.exec-titulo .exec-n { color: var(--tinta-3); font-weight: 500; font-size: .85rem; }

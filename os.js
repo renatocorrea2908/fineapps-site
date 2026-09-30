@@ -19,6 +19,10 @@ const CHAVE_SESSAO = 'fineapps.os.sessao';
 let SESSAO = null;
 let RETRATO = null;
 let COM_O_JOHN = null;   // (M644) o backlog do John: o que ele especifica, o que espera vaga, o que liberou
+let MESA_EXEC = null;   // (M649, 30/09 — CEO) quem é o executivo de cada aviso, pedido e pendência: o banco decide, a tela agrupa
+const EXEC_SEL = { aprov: lerExecSel('aprov'), avisos: lerExecSel('avisos') };
+function lerExecSel(p) { try { return localStorage.getItem('os-exec-' + p) || 'todos'; } catch { return 'todos'; } }
+function gravarExecSel(p, v) { EXEC_SEL[p] = v; try { localStorage.setItem('os-exec-' + p, v); } catch { /* só nesta aba */ } }
 let PEDIDOS_CEO = [];   // (M639, 29/09) pendências do repositório e gaps do John que esperam o SIM do CEO antes da triagem
 let RELOGIO = null;
 // (28/09, G1b) 11 → 8 páginas: Caminhos e Report moram dentro de Itens; os endereços antigos (#paths, #report) levam para lá
@@ -199,12 +203,14 @@ async function atualizarAgora() {
 //    As duas saem em paralelo: o tempo de tela é o da mais lenta, não a soma.
 let AVISOS = { sem_ciencia: 0, itens: [] }
 async function abrirCasa() {
-  const [retrato, avisos, pedCeo, john] = await Promise.all([
+  const [retrato, avisos, pedCeo, john, mesaExec] = await Promise.all([
     rpc('company_os_meu_retrato'),
     rpc('company_os_meus_avisos').catch(() => null),
     rpc('company_os_pedidos_aguardando_ceo').catch(() => null),   // (M639) antes da triagem: só com o seu sim
     rpc('company_os_com_o_john').catch(() => null),               // (M644) o que está com o John
+    rpc('company_os_minha_mesa_por_executivo').catch(() => null), // (M649) o executivo de cada coisa
   ])
+  MESA_EXEC = mesaExec && Array.isArray(mesaExec.executivos) && mesaExec.executivos.length ? mesaExec : null
   COM_O_JOHN = john && Array.isArray(john.pedidos) ? john : null
   if (avisos && avisos.itens) AVISOS = avisos
   PEDIDOS_CEO = Array.isArray(pedCeo) ? pedCeo : []
@@ -643,11 +649,11 @@ function desenharFicha(f) {
 /* (M639, 29/09 — decisão do CEO) Pedidos que esperam o SIM antes de qualquer IA: as pendências do repositório do
    Stratum e, depois, os gaps da pesquisa do John Prod. Aprovar libera — produto vai ao John (especificação e critério
    de aceite antes de liberar), técnico vai à triagem. Recusar pede o motivo, e o pedido morre ali. */
-function desenharPedidosDoCeo(alvo) {
+function desenharPedidosDoCeo(alvo, pedidos = PEDIDOS_CEO) {
   const bloco = el('div', 'pedidos-ceo')
-  bloco.appendChild(el('h3', null, `Esperando o seu sim — antes da triagem (${PEDIDOS_CEO.length})`))
+  bloco.appendChild(el('h3', null, `Esperando o seu sim — antes da triagem (${pedidos.length})`))
   bloco.appendChild(el('p', 'dica', 'Nenhuma IA roda nestes pedidos até você decidir. Produto aprovado vai ao John Prod (especificação e critério de aceite antes de liberar); técnico aprovado vai à triagem.'))
-  for (const p of PEDIDOS_CEO) {
+  for (const p of pedidos) {
     const cx = el('article', 'item espera'); cx.id = 'pedido-ceo-' + p.id
     cx.appendChild(el('h4', null, p.titulo))
     const m = el('div', 'meta')
@@ -692,6 +698,118 @@ function desenharComOJohn(alvo) {
   alvo.appendChild(d)
 }
 
+function cartaoPendencia(p, i) {
+  const cx = el('article', 'item ' + (Number(p.dias_esperando) >= 2 ? 'urgente' : 'espera'));
+  cx.id = 'caixa-' + p.id;
+  if (i) { const cab = el('button', 'item-cab'); cab.title = 'Abrir o detalhe'; cab.appendChild(el('h4', null, p.titulo)); cab.addEventListener('click', () => abrirGaveta(i.id)); cx.appendChild(cab); }
+  else cx.appendChild(el('h4', null, p.titulo));
+  if (i) { const lc = linkChamado(i); if (lc) cx.appendChild(lc); }
+  const m = el('div', 'meta');
+  // ⚠ Aprovações montava o próprio cartão e por isso ficou de fora da
+  //    primeira passada — a aba mais importante da tela seguia com a linha
+  //    corrida e com `impacto none` na cara do CEO. Mesmo padrão do resto:
+  //    situação colorida, grupos com divisor, espera e dinheiro à direita.
+  const escalado = p.classe === 'travado' && p.contexto && p.contexto.escalado_pelo_cto;
+  m.appendChild(el('span', 'sit espera', escalado ? 'escalado pelo CTO — precisa da sua decisão' : (ROTULO_CLASSE[p.classe] || p.classe)));
+  if (i) m.append(tag(i.empresa, 'empresa', i.empresa), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
+                  tag(i.fila, 'fila', i.fila), el('span', 'div', '·'), tagNatureza(i), tagOrigem(i), tag(rotuloTipo(i.tipo), 'tipo', i.tipo));
+  const impA = IMPACTOS[p.impacto];
+  if (impA) m.appendChild(el('span', null, impA));
+  const dirA = el('span', 'meta-dir');
+  // ⚠ "2 dia(s) esperando" é o número que ordena esta lista: fica à direita,
+  //    alinhado com os outros, e em âmbar a partir de 2 dias.
+  const esp = el('span', Number(p.dias_esperando) >= 2 ? 'quente' : null, esperaTexto(p.dias_esperando));
+  dirA.appendChild(esp);
+  if (Number(p.custo_ja_gasto) > 0) dirA.appendChild(el('span', 'dinheiro', moeda(p.custo_ja_gasto)));
+  m.appendChild(dirA);
+  cx.append(m); subirDir(cx);
+  const ficha = p.contexto && p.contexto.ficha;
+  if (ficha && ficha.pergunta) cx.appendChild(desenharFicha(ficha));
+  else cx.appendChild(el('p', 'porque', p.porque_voce));
+  if (i && i.descricao) { const d = chave(el('details'), 'det:pedido:' + p.id); d.append(el('summary', null, 'Ver o pedido inteiro'), el('div', 'descricao', i.descricao)); cx.appendChild(d); }
+  if (p.classe === 'aguarda_alcada') {
+    // (M455) A pergunta que o CEO já fez sobre este item, e a resposta quando
+    // ela chegou — o banco as guarda no item; a tela só mostra.
+    const pg = p.contexto && p.contexto.pergunta;
+    if (pg && pg.id) {
+      const q = el('div', 'pergunta');
+      q.appendChild(el('p', 'porque', `Você perguntou${pg.em ? ' em ' + quando(pg.em) : ''}: “${pg.texto || '—'}”`));
+      q.appendChild(pg.resposta
+        ? el('p', 'porque resposta', `Resposta${pg.respondida_em ? ' em ' + quando(pg.respondida_em) : ''}: ${pg.resposta}`)
+        : el('p', 'dica', pg.estado === 'cancelled' ? 'A pergunta foi cancelada.' : 'Sem resposta ainda — o Rayn Ops (COO / CTO) responde pela oficina; a resposta também chega na aba Avisos.'));
+      cx.appendChild(q);
+    }
+    // ⚠ Três saídas, não uma: aprovar, reprovar (o NÃO com motivo — vai para
+    //    `cancelado` com rastro `rejected`) e questionar (abre pergunta ao COO
+    //    com este item como pai; o item continua aqui até você decidir).
+    cx.appendChild(caixaAcao(p, [
+      ['Aprovar', 'company_os_minha_aprovacao', 'p_observacao', { p_canal: 'tela-os' }],
+      ['Questionar', 'company_os_questionar', 'p_pergunta'],
+      ['Reprovar', 'company_os_reprovar', 'p_motivo', null, 'perigo'],
+    ], 'Motivo (para aprovar ou reprovar) ou a pergunta ao COO / CTO (para questionar) — mínimo 10 letras'));
+  }
+  if (p.classe === 'entrega_aguarda_aceite') {
+    const ref = (p.contexto && p.contexto.referencia) || '';
+    // (29/09, CEO: "como eu ia aceitar se não vi como a tela ficaria?") a PRÉVIA do Vercel vem primeiro: aceitar é olhar
+    const detalhe = String((p.contexto && p.contexto.detalhe) || '');
+    const previa = previaDaEntrega(ref, detalhe, p.id);
+    if (previa) { const a = el('a', 'btn previa', 'Ver como ficou (prévia)'); a.appendChild(icone('externo')); a.href = previa; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
+    if (/^https?:\/\//.test(ref)) { const a = el('a', 'ligacao', previa ? 'Ver o código (PR)' : 'Abrir a entrega (PR) em nova aba'); a.appendChild(icone('externo')); a.href = ref; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
+    else if (ref) cx.appendChild(el('p', 'porque', 'Evidência: ' + ref));
+    const semLink = detalhe.replace(/\s*Ver como ficou \(prévia\):\s*\S+/, '').trim();
+    if (semLink) cx.appendChild(el('p', 'porque', semLink));
+    cx.appendChild(caixaAcao(p, [['Aceitar entrega', 'company_os_aceitar_entrega', 'p_observacao'], ['Recusar', 'company_os_recusar_entrega', 'p_motivo', null, 'perigo']],
+      'Observação (para aceitar) ou motivo (para recusar) — mínimo 10 letras'));
+  }
+  if (p.classe === 'travado') cx.appendChild(caixaAcao(p, [['Devolver à fila', 'company_os_devolver_a_fila', 'p_motivo'], ['Cancelar item', 'company_os_cancelar_item', 'p_motivo', null, 'perigo']],
+    'O que mudou (para devolver) ou por que encerrar (para cancelar) — mínimo 10 letras'));
+  if (p.classe === 'deliberacao_escalada') cx.appendChild(caixaEscalada(p));
+  return cx;
+}
+
+/* (M649, 30/09 — CEO: "separa em CFO, CPO, CTO/COO e CMO, para eu resolver um executivo de cada vez, como em reunião")
+   Quem é o executivo de cada coisa vem do banco (company_os_minha_mesa_por_executivo); aqui só se agrupa. */
+function execDe(tipo, id) { const m = MESA_EXEC && MESA_EXEC[tipo]; return (m && m[id]) || 'cto'; }
+function barraExec(pagina, contagem, redesenhar) {
+  const b = el('div', 'badges exec-barra');
+  const total = Object.values(contagem).reduce((a, n) => a + n, 0);
+  const opcoes = [['todos', 'Todos', total], ...MESA_EXEC.executivos.map((x) => [x.chave, `${x.cargo} · ${x.nome}`, contagem[x.chave] || 0])];
+  for (const [k, rot, n] of opcoes) {
+    const bt = el('button', 'badge' + (n ? '' : ' zero')); bt.type = 'button'; bt.setAttribute('aria-pressed', String(EXEC_SEL[pagina] === k));
+    bt.append(document.createTextNode(rot + ' '), el('span', 'pill' + (n && k !== 'todos' ? ' vermelho' : ''), String(n)));
+    bt.addEventListener('click', () => { gravarExecSel(pagina, k); redesenhar(); });
+    b.appendChild(bt);
+  }
+  return b;
+}
+function secaoExec(x, n) {
+  const sec = el('section', 'exec-secao');
+  const h = el('h3', 'exec-titulo'); h.append(el('b', null, x.cargo), document.createTextNode(' — ' + x.nome), el('span', 'exec-n', n ? ` · ${n} com você` : ' · nada agora'));
+  sec.appendChild(h);
+  return sec;
+}
+function desenharPorExecutivo(alvo, lista, porId) {
+  const sel = EXEC_SEL.aprov;
+  const conta = {}; for (const x of MESA_EXEC.executivos) conta[x.chave] = 0;
+  for (const p of PEDIDOS_CEO) conta[execDe('pedidos', p.id)] = (conta[execDe('pedidos', p.id)] || 0) + 1;
+  for (const p of lista) conta[execDe('pendencias', p.id)] = (conta[execDe('pendencias', p.id)] || 0) + 1;
+  alvo.insertBefore(barraExec('aprov', conta, () => desenharCaixa('aprov')), alvo.firstChild);
+  let algum = false;
+  for (const x of MESA_EXEC.executivos) {
+    if (sel !== 'todos' && sel !== x.chave) continue;
+    const peds = PEDIDOS_CEO.filter((p) => execDe('pedidos', p.id) === x.chave);
+    const its = lista.filter((p) => execDe('pendencias', p.id) === x.chave);
+    if (sel === 'todos' && !peds.length && !its.length) continue;
+    const sec = secaoExec(x, peds.length + its.length);
+    if (peds.length) desenharPedidosDoCeo(sec, peds);
+    if (x.chave === 'cpo') desenharComOJohn(sec);
+    for (const p of its) sec.appendChild(cartaoPendencia(p, porId.get(p.id)));
+    if (!peds.length && !its.length) sec.appendChild(el('p', 'dica', `Nada espera você com o ${x.cargo}.`));
+    alvo.appendChild(sec); algum = true;
+  }
+  if (!algum) alvo.appendChild(vazioGrande('Aprovações limpas', 'Nada espera a sua alçada. A fila anda sozinha.'));
+}
+
 function desenharCaixa(modo) {
   const ehAceite = modo === 'aceite';
   const porId = new Map(todosItens().map((i) => [i.id, i]));
@@ -707,8 +825,9 @@ function desenharCaixa(modo) {
     : ehAceite ? `${lista.length} entrega(s) prontas que só fecham com o seu aceite (ou recusa com motivo). As mais antigas primeiro.`
                : `${lista.length} item(ns) não começam até você decidir. As mais antigas primeiro.`;
   const alvo = $('lista-' + modo); alvo.replaceChildren();
-  if (!ehAceite && PEDIDOS_CEO.length) desenharPedidosDoCeo(alvo);
-  if (!ehAceite) desenharComOJohn(alvo);
+  const agrupar = !ehAceite && MESA_EXEC;
+  if (!agrupar && !ehAceite && PEDIDOS_CEO.length) desenharPedidosDoCeo(alvo);
+  if (!agrupar && !ehAceite) desenharComOJohn(alvo);
   // (M472/D6) o que já subiu e ainda não tem a ficha: você vê que existe, mas só decide com a ficha
   const prep = (((RETRATO.inbox && RETRATO.inbox.em_preparo) || {}).itens || []).filter((x) => (x.classe === 'entrega_aguarda_aceite') === ehAceite);
   if (prep.length) {
@@ -716,76 +835,9 @@ function desenharCaixa(modo) {
     f.appendChild(el('span', null, `${num(prep.length)} decisão(ões) em preparo: a Triagem está escrevendo a ficha de uma página. ${prep.length === 1 ? 'Ela chega' : 'Elas chegam'} aqui quando estiver${prep.length === 1 ? '' : 'em'} completa${prep.length === 1 ? '' : 's'}.`));
     f.title = prep.map((x) => x.titulo).join('\n'); alvo.appendChild(f);
   }
-  if (!lista.length && (ehAceite || !PEDIDOS_CEO.length)) alvo.appendChild(vazioGrande(ehAceite ? 'Aceitações limpas' : 'Aprovações limpas', total ? 'Nada com os filtros atuais.' : limpo));
-  for (const p of lista) {
-    const i = porId.get(p.id);
-    const cx = el('article', 'item ' + (Number(p.dias_esperando) >= 2 ? 'urgente' : 'espera'));
-    cx.id = 'caixa-' + p.id;
-    if (i) { const cab = el('button', 'item-cab'); cab.title = 'Abrir o detalhe'; cab.appendChild(el('h4', null, p.titulo)); cab.addEventListener('click', () => abrirGaveta(i.id)); cx.appendChild(cab); }
-    else cx.appendChild(el('h4', null, p.titulo));
-    if (i) { const lc = linkChamado(i); if (lc) cx.appendChild(lc); }
-    const m = el('div', 'meta');
-    // ⚠ Aprovações montava o próprio cartão e por isso ficou de fora da
-    //    primeira passada — a aba mais importante da tela seguia com a linha
-    //    corrida e com `impacto none` na cara do CEO. Mesmo padrão do resto:
-    //    situação colorida, grupos com divisor, espera e dinheiro à direita.
-    const escalado = p.classe === 'travado' && p.contexto && p.contexto.escalado_pelo_cto;
-    m.appendChild(el('span', 'sit espera', escalado ? 'escalado pelo CTO — precisa da sua decisão' : (ROTULO_CLASSE[p.classe] || p.classe)));
-    if (i) m.append(tag(i.empresa, 'empresa', i.empresa), tag(i.produto || 'sem produto', 'produto', i.produto || '— sem produto —'),
-                    tag(i.fila, 'fila', i.fila), el('span', 'div', '·'), tagNatureza(i), tagOrigem(i), tag(rotuloTipo(i.tipo), 'tipo', i.tipo));
-    const impA = IMPACTOS[p.impacto];
-    if (impA) m.appendChild(el('span', null, impA));
-    const dirA = el('span', 'meta-dir');
-    // ⚠ "2 dia(s) esperando" é o número que ordena esta lista: fica à direita,
-    //    alinhado com os outros, e em âmbar a partir de 2 dias.
-    const esp = el('span', Number(p.dias_esperando) >= 2 ? 'quente' : null, esperaTexto(p.dias_esperando));
-    dirA.appendChild(esp);
-    if (Number(p.custo_ja_gasto) > 0) dirA.appendChild(el('span', 'dinheiro', moeda(p.custo_ja_gasto)));
-    m.appendChild(dirA);
-    cx.append(m); subirDir(cx);
-    const ficha = p.contexto && p.contexto.ficha;
-    if (ficha && ficha.pergunta) cx.appendChild(desenharFicha(ficha));
-    else cx.appendChild(el('p', 'porque', p.porque_voce));
-    if (i && i.descricao) { const d = chave(el('details'), 'det:pedido:' + p.id); d.append(el('summary', null, 'Ver o pedido inteiro'), el('div', 'descricao', i.descricao)); cx.appendChild(d); }
-    if (p.classe === 'aguarda_alcada') {
-      // (M455) A pergunta que o CEO já fez sobre este item, e a resposta quando
-      // ela chegou — o banco as guarda no item; a tela só mostra.
-      const pg = p.contexto && p.contexto.pergunta;
-      if (pg && pg.id) {
-        const q = el('div', 'pergunta');
-        q.appendChild(el('p', 'porque', `Você perguntou${pg.em ? ' em ' + quando(pg.em) : ''}: “${pg.texto || '—'}”`));
-        q.appendChild(pg.resposta
-          ? el('p', 'porque resposta', `Resposta${pg.respondida_em ? ' em ' + quando(pg.respondida_em) : ''}: ${pg.resposta}`)
-          : el('p', 'dica', pg.estado === 'cancelled' ? 'A pergunta foi cancelada.' : 'Sem resposta ainda — o Rayn Ops (COO / CTO) responde pela oficina; a resposta também chega na aba Avisos.'));
-        cx.appendChild(q);
-      }
-      // ⚠ Três saídas, não uma: aprovar, reprovar (o NÃO com motivo — vai para
-      //    `cancelado` com rastro `rejected`) e questionar (abre pergunta ao COO
-      //    com este item como pai; o item continua aqui até você decidir).
-      cx.appendChild(caixaAcao(p, [
-        ['Aprovar', 'company_os_minha_aprovacao', 'p_observacao', { p_canal: 'tela-os' }],
-        ['Questionar', 'company_os_questionar', 'p_pergunta'],
-        ['Reprovar', 'company_os_reprovar', 'p_motivo', null, 'perigo'],
-      ], 'Motivo (para aprovar ou reprovar) ou a pergunta ao COO / CTO (para questionar) — mínimo 10 letras'));
-    }
-    if (p.classe === 'entrega_aguarda_aceite') {
-      const ref = (p.contexto && p.contexto.referencia) || '';
-      // (29/09, CEO: "como eu ia aceitar se não vi como a tela ficaria?") a PRÉVIA do Vercel vem primeiro: aceitar é olhar
-      const detalhe = String((p.contexto && p.contexto.detalhe) || '');
-      const previa = previaDaEntrega(ref, detalhe, p.id);
-      if (previa) { const a = el('a', 'btn previa', 'Ver como ficou (prévia)'); a.appendChild(icone('externo')); a.href = previa; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
-      if (/^https?:\/\//.test(ref)) { const a = el('a', 'ligacao', previa ? 'Ver o código (PR)' : 'Abrir a entrega (PR) em nova aba'); a.appendChild(icone('externo')); a.href = ref; a.target = '_blank'; a.rel = 'noopener noreferrer'; cx.appendChild(a); }
-      else if (ref) cx.appendChild(el('p', 'porque', 'Evidência: ' + ref));
-      const semLink = detalhe.replace(/\s*Ver como ficou \(prévia\):\s*\S+/, '').trim();
-      if (semLink) cx.appendChild(el('p', 'porque', semLink));
-      cx.appendChild(caixaAcao(p, [['Aceitar entrega', 'company_os_aceitar_entrega', 'p_observacao'], ['Recusar', 'company_os_recusar_entrega', 'p_motivo', null, 'perigo']],
-        'Observação (para aceitar) ou motivo (para recusar) — mínimo 10 letras'));
-    }
-    if (p.classe === 'travado') cx.appendChild(caixaAcao(p, [['Devolver à fila', 'company_os_devolver_a_fila', 'p_motivo'], ['Cancelar item', 'company_os_cancelar_item', 'p_motivo', null, 'perigo']],
-      'O que mudou (para devolver) ou por que encerrar (para cancelar) — mínimo 10 letras'));
-    if (p.classe === 'deliberacao_escalada') cx.appendChild(caixaEscalada(p));
-    alvo.appendChild(cx);
-  }
+  if (!agrupar && !lista.length && (ehAceite || !PEDIDOS_CEO.length)) alvo.appendChild(vazioGrande(ehAceite ? 'Aceitações limpas' : 'Aprovações limpas', total ? 'Nada com os filtros atuais.' : limpo));
+  if (!ehAceite && MESA_EXEC) { desenharPorExecutivo(alvo, lista, porId); }
+  else for (const p of lista) alvo.appendChild(cartaoPendencia(p, porId.get(p.id)));
   // Só para você saber: o que a régua (CI) aceitou nos últimos 7 dias — informação, não pendência (M397).
   // Mora em Aceitações: é a outra metade da mesma pergunta ("ficou bom?"), respondida sem você.
   if (!ehAceite) return;
@@ -1228,56 +1280,74 @@ function desenharAvisos() {
   const alvo = $('lista-avisos'); alvo.replaceChildren()
   if (!lista.length) { alvo.appendChild(vazioGrande('Fila de avisos limpa', 'Quando o sistema parar por algo que você não precisa decidir, ele conta aqui.')); return }
 
-  for (const a of lista) {
-    const cx = el('article', 'item' + (a.visto_em ? ' info' : ' espera'))
-    cx.appendChild(el('h4', null, a.assunto))
-    const m = el('div', 'meta')
-    // ⚠ O TOM diz há quanto tempo ele está parado ali: a régua OS41 acende aos
-    //    7 dias, e a tela avisa antes de a régua acender.
-    const d = Number(a.dias_sem_ciencia)
-    m.appendChild(el('span', 'sit ' + (a.visto_em ? 'ok' : d >= 7 ? 'parado' : 'espera'),
-      a.visto_em ? 'ciência dada' : d >= 1 ? `sem ciência há ${d} dia(s)` : 'novo'))
-    m.appendChild(el('span', null, a.origem))
-    const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, quando(a.criado_em)))
-    m.appendChild(dir)
-    cx.appendChild(m); subirDir(cx)
-    // ⚠ O corpo inteiro, sem cortar: ele diz o que mudou, o que já foi tentado
-    //    e o que acontece se nada for feito. Cortar isso devolveria ao CEO a
-    //    tarefa em vez da decisão, que é o §10.2 ao contrário.
-    cx.appendChild(el('div', 'descricao', a.corpo))
-    if (a.medido && Object.keys(a.medido).length) {
-      const det = chave(el('details'), 'det:medido:' + a.id); det.appendChild(el('summary', null, 'Ver os números medidos'))
-      const pre = el('pre', null, JSON.stringify(a.medido, null, 2)); det.appendChild(pre); cx.appendChild(det)
-    }
-
-    const caixa = el('div', 'acao-caixa')
-    if (!a.visto_em) {
-      const b = el('button', 'btn sec', 'Dar ciência')
-      b.addEventListener('click', () => acaoAviso('company_os_dar_ciencia', { p_ids: [a.id] }, 'Ciência registrada.'))
-      caixa.appendChild(b)
-    }
-    // (M455) A resposta do COO chega como OUTRO aviso nesta fila (origem
-    //    `resposta-ao-ceo`) — é o único caminho que o CEO lê sem depender de
-    //    ninguém. O que a tela pode dizer aqui é que a pergunta existe e onde ela está.
-    if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO / CTO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em Organograma.'))
-    else {
-      const inp = chave(el('input'), 'perg:' + a.id); inp.placeholder = 'Perguntar ao COO / CTO (mínimo 10 letras)'
-      // (M622) pedido devolvido por ser PERGUNTA: o texto do CEO já vem no campo — um clique e vai ao COO
-      if (a.medido && a.medido.pergunta_sugerida && !inp.value) inp.value = String(a.medido.pergunta_sugerida)
-      const b2 = el('button', 'btn', 'Perguntar')
-      b2.addEventListener('click', () => {
-        if (inp.value.trim().length < 10) { mostrar($('msg-avisos'), 'Escreva a pergunta (mínimo 10 letras).', false); return }
-        acaoAviso('company_os_perguntar_ao_coo', { p_aviso_id: a.id, p_pergunta: inp.value.trim() },
-                  'Pergunta aberta ao COO / CTO, com o fato medido junto.', inp)
-      })
-      caixa.append(inp, b2)
-    }
-    cx.appendChild(caixa)
-    alvo.appendChild(cx)
+  if (!MESA_EXEC) { for (const a of lista) alvo.appendChild(cartaoAviso(a)); return }
+  // (M649) por executivo: um de cada vez, como em reunião
+  const sel = EXEC_SEL.avisos
+  const conta = {}; for (const x of MESA_EXEC.executivos) conta[x.chave] = 0
+  for (const a of novos) conta[execDe('avisos', a.id)] = (conta[execDe('avisos', a.id)] || 0) + 1
+  alvo.appendChild(barraExec('avisos', conta, () => desenharAvisos()))
+  let algum = false
+  for (const x of MESA_EXEC.executivos) {
+    if (sel !== 'todos' && sel !== x.chave) continue
+    const dele = lista.filter((a) => execDe('avisos', a.id) === x.chave)
+    if (sel === 'todos' && !dele.length) continue
+    const sec = secaoExec(x, dele.filter((a) => !a.visto_em).length)
+    for (const a of dele) sec.appendChild(cartaoAviso(a))
+    if (!dele.length) sec.appendChild(el('p', 'dica', `Nada do ${x.cargo} para você saber agora.`))
+    alvo.appendChild(sec); algum = true
   }
+  if (!algum) alvo.appendChild(vazioGrande('Fila de avisos limpa', 'Quando o sistema parar por algo que você não precisa decidir, ele conta aqui.'))
+}
+function cartaoAviso(a) {
+  const cx = el('article', 'item' + (a.visto_em ? ' info' : ' espera'))
+  cx.appendChild(el('h4', null, a.assunto))
+  const m = el('div', 'meta')
+  // ⚠ O TOM diz há quanto tempo ele está parado ali: a régua OS41 acende aos
+  //    7 dias, e a tela avisa antes de a régua acender.
+  const d = Number(a.dias_sem_ciencia)
+  m.appendChild(el('span', 'sit ' + (a.visto_em ? 'ok' : d >= 7 ? 'parado' : 'espera'),
+    a.visto_em ? 'ciência dada' : d >= 1 ? `sem ciência há ${d} dia(s)` : 'novo'))
+  m.appendChild(el('span', null, a.origem))
+  const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, quando(a.criado_em)))
+  m.appendChild(dir)
+  cx.appendChild(m); subirDir(cx)
+  // ⚠ O corpo inteiro, sem cortar: ele diz o que mudou, o que já foi tentado
+  //    e o que acontece se nada for feito. Cortar isso devolveria ao CEO a
+  //    tarefa em vez da decisão, que é o §10.2 ao contrário.
+  cx.appendChild(el('div', 'descricao', a.corpo))
+  if (a.medido && Object.keys(a.medido).length) {
+    const det = chave(el('details'), 'det:medido:' + a.id); det.appendChild(el('summary', null, 'Ver os números medidos'))
+    const pre = el('pre', null, JSON.stringify(a.medido, null, 2)); det.appendChild(pre); cx.appendChild(det)
+  }
+
+  const caixa = el('div', 'acao-caixa')
+  if (!a.visto_em) {
+    const b = el('button', 'btn sec', 'Dar ciência')
+    b.addEventListener('click', () => acaoAviso('company_os_dar_ciencia', { p_ids: [a.id] }, 'Ciência registrada.'))
+    caixa.appendChild(b)
+  }
+  // (M455) A resposta do COO chega como OUTRO aviso nesta fila (origem
+  //    `resposta-ao-ceo`) — é o único caminho que o CEO lê sem depender de
+  //    ninguém. O que a tela pode dizer aqui é que a pergunta existe e onde ela está.
+  if (a.pergunta_id) caixa.appendChild(el('span', 'dica', 'Pergunta aberta ao COO / CTO — a resposta chega aqui, como um aviso “Resposta: …”. Veja o item em Organograma.'))
+  else {
+    const inp = chave(el('input'), 'perg:' + a.id); inp.placeholder = 'Perguntar ao COO / CTO (mínimo 10 letras)'
+    // (M622) pedido devolvido por ser PERGUNTA: o texto do CEO já vem no campo — um clique e vai ao COO
+    if (a.medido && a.medido.pergunta_sugerida && !inp.value) inp.value = String(a.medido.pergunta_sugerida)
+    const b2 = el('button', 'btn', 'Perguntar')
+    b2.addEventListener('click', () => {
+      if (inp.value.trim().length < 10) { mostrar($('msg-avisos'), 'Escreva a pergunta (mínimo 10 letras).', false); return }
+      acaoAviso('company_os_perguntar_ao_coo', { p_aviso_id: a.id, p_pergunta: inp.value.trim() },
+                'Pergunta aberta ao COO / CTO, com o fato medido junto.', inp)
+    })
+    caixa.append(inp, b2)
+  }
+  cx.appendChild(caixa)
+  return cx
 }
 $('btn-ciencia').addEventListener('click', () => {
-  const ids = (AVISOS.itens || []).filter((a) => !a.visto_em).map((a) => a.id).slice(0, 50)
+  const sel = MESA_EXEC ? EXEC_SEL.avisos : 'todos'   // (M649) com um executivo escolhido, a ciência é só dos avisos dele
+  const ids = (AVISOS.itens || []).filter((a) => !a.visto_em && (sel === 'todos' || execDe('avisos', a.id) === sel)).map((a) => a.id).slice(0, 50)
   if (!ids.length) return
   acaoAviso('company_os_dar_ciencia', { p_ids: ids }, `Ciência registrada em ${ids.length} aviso(s).`)
 })
