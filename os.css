@@ -870,3 +870,7 @@ details.com-o-john .linha-john { padding: .35rem 0; border-top: 1px solid var(--
 .item .pergunta-mesa .porque:first-child { margin-top: 0; }
 .item .pergunta-mesa .resposta { color: var(--tinta); }
 .item .pergunta-mesa .acao-caixa { margin-top: .4rem; }
+.nav .nav-toggle { display: inline-flex; align-items: center; justify-content: center; width: 1.3rem; height: 1.3rem; border-radius: 5px; color: var(--tinta-3); font-size: .8rem; transition: transform .15s; }
+.nav .nav-toggle:hover { background: var(--sup-3); color: var(--tinta); }
+.nav .nav-toggle.fechado { transform: rotate(-90deg); }
+.nav .nav-sub[hidden] { display: none; }

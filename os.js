@@ -409,6 +409,9 @@ const TITULOS = {
 };
 function irPara(aba) { if (PAGINAS_ANTIGAS[aba]) { MODO_ITENS = PAGINAS_ANTIGAS[aba][1]; aba = PAGINAS_ANTIGAS[aba][0]; } if (!PAGINAS.includes(aba)) return; ABA = aba; if (GAVETA) { GAVETA = null; desenharGaveta(); } mostrarAba(); window.scrollTo({ top: 0 }); }
 document.addEventListener('click', (e) => {
+  // (30/09) a setinha abre/fecha o submenu — sem navegar
+  const tg = e.target.closest('[data-nav-toggle]');
+  if (tg) { e.preventDefault(); e.stopPropagation(); alternarSub(tg.dataset.navToggle); return; }
   // (30/09) sub-item do menu lateral: a página já aberta no executivo
   const ex = e.target.closest('[data-exec-nav]');
   if (ex) { const [pg, k] = ex.dataset.execNav.split(':'); gravarExecSel(pg, k); irPara(pg); if (pg === 'aprov') desenharCaixa('aprov'); else desenharAvisos(); desenharNavExec(); return; }
@@ -809,12 +812,24 @@ function contagemExec(pagina) {
   }
   return c;
 }
+function subFechado(p) { try { return localStorage.getItem('os-nav-sub-' + p) === 'fechado'; } catch { return false; } }
+function alternarSub(p) { try { localStorage.setItem('os-nav-sub-' + p, subFechado(p) ? 'aberto' : 'fechado'); } catch { /* só nesta aba */ } desenharNavExec(); }
 function desenharNavExec() {
   for (const pagina of ['aprov', 'avisos']) {
     const botao = document.querySelector(`#abas button[data-aba="${pagina}"]`); if (!botao) continue;
     let sub = document.getElementById('nav-sub-' + pagina);
     if (!MESA_EXEC) { if (sub) sub.remove(); continue; }
     if (!sub) { sub = el('div', 'nav-sub'); sub.id = 'nav-sub-' + pagina; botao.after(sub); }
+    // (30/09, CEO) o submenu abre e fecha: a setinha no próprio item; a escolha fica lembrada neste navegador
+    let seta = botao.querySelector('.nav-toggle');
+    if (!seta) {
+      seta = el('span', 'nav-toggle'); seta.setAttribute('role', 'button'); seta.tabIndex = 0; seta.dataset.navToggle = pagina;
+      seta.setAttribute('aria-label', 'Abrir ou fechar os executivos'); seta.textContent = '▾';
+      botao.insertBefore(seta, botao.querySelector('.pill') || botao.querySelector('kbd'));
+    }
+    const fechado = subFechado(pagina);
+    seta.setAttribute('aria-expanded', String(!fechado)); seta.classList.toggle('fechado', fechado);
+    sub.hidden = fechado;
     sub.replaceChildren();
     const c = contagemExec(pagina);
     for (const x of MESA_EXEC.executivos) {
