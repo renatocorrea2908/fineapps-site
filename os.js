@@ -18,6 +18,7 @@ const CHAVE_SESSAO = 'fineapps.os.sessao';
 
 let SESSAO = null;
 let RETRATO = null;
+let COM_O_JOHN = null;   // (M644) o backlog do John: o que ele especifica, o que espera vaga, o que liberou
 let PEDIDOS_CEO = [];   // (M639, 29/09) pendências do repositório e gaps do John que esperam o SIM do CEO antes da triagem
 let RELOGIO = null;
 // (28/09, G1b) 11 → 8 páginas: Caminhos e Report moram dentro de Itens; os endereços antigos (#paths, #report) levam para lá
@@ -198,11 +199,13 @@ async function atualizarAgora() {
 //    As duas saem em paralelo: o tempo de tela é o da mais lenta, não a soma.
 let AVISOS = { sem_ciencia: 0, itens: [] }
 async function abrirCasa() {
-  const [retrato, avisos, pedCeo] = await Promise.all([
+  const [retrato, avisos, pedCeo, john] = await Promise.all([
     rpc('company_os_meu_retrato'),
     rpc('company_os_meus_avisos').catch(() => null),
     rpc('company_os_pedidos_aguardando_ceo').catch(() => null),   // (M639) antes da triagem: só com o seu sim
+    rpc('company_os_com_o_john').catch(() => null),               // (M644) o que está com o John
   ])
+  COM_O_JOHN = john && Array.isArray(john.pedidos) ? john : null
   if (avisos && avisos.itens) AVISOS = avisos
   PEDIDOS_CEO = Array.isArray(pedCeo) ? pedCeo : []
   if (!retrato || !retrato.estrutura) {
@@ -653,6 +656,7 @@ function desenharPedidosDoCeo(alvo) {
     if (p.origem === 'pendencia') m.appendChild(el('span', null, 'pendência do repositório do Stratum'))
     const dir = el('span', 'meta-dir'); dir.appendChild(el('span', null, esperaTexto(Math.floor((Date.now() - Date.parse(p.desde)) / 86400000)))); m.appendChild(dir)
     cx.appendChild(m)
+    if (p.parecer_do_john) { const pj = el('div'); pj.append(el('div', 'ficha-rot', 'O John devolveu a você'), el('div', 'ficha-pergunta', p.parecer_do_john)); cx.appendChild(pj) }
     const det = el('details'); det.appendChild(el('summary', null, 'Ler o pedido inteiro')); const pre = el('div', 'texto-pedido'); pre.textContent = p.descricao || ''; pre.style.whiteSpace = 'pre-wrap'; det.appendChild(pre); cx.appendChild(det)
     const acao = el('div', 'acao-caixa')
     const mot = el('input'); mot.type = 'text'; mot.placeholder = 'Nota (obrigatória para recusar, 10+ letras)'
@@ -667,6 +671,25 @@ function desenharPedidosDoCeo(alvo) {
     bloco.appendChild(cx)
   }
   alvo.appendChild(bloco)
+}
+
+/* (M644, I1 fase 2) "Com o John": o que ele está especificando, o que espera vaga na squad (até N por semana) e o que
+   ele liberou em 7 dias. Informação, não pendência sua — o que precisa de você chega como pedido devolvido, acima. */
+function desenharComOJohn(alvo) {
+  const b = COM_O_JOHN
+  if (!b || (!b.pedidos.length && !(b.liberados_7d || []).length)) return
+  const d = el('details', 'com-o-john'); d.open = false
+  const esperando = b.pedidos.filter((x) => !x.especificado).length, naFila = b.pedidos.filter((x) => x.especificado).length
+  d.appendChild(el('summary', null, `Com o John Prod — ${esperando} para especificar · ${naFila} esperando vaga · ${(b.liberados_7d || []).length} liberado(s) em 7 dias`))
+  d.appendChild(el('p', 'dica', `Ele prioriza, escreve a especificação e o critério de aceite; a casa libera na ordem dele, até ${b.teto_por_squad_semana} por squad por semana, sem IA.`))
+  for (const x of b.pedidos) {
+    const li = el('div', 'linha-john')
+    const sit = x.erro_na_liberacao ? 'a casa não conseguiu liberar — ele corrige' : x.especificado ? `especificado · prioridade ${x.prioridade_john} · espera vaga em ${x.squad || '?'}` : 'esperando a especificação dele'
+    li.append(el('b', null, (x.codigo ? x.codigo + ' — ' : '') + x.titulo), el('span', 'dica', ' · ' + sit))
+    d.appendChild(li)
+  }
+  for (const x of (b.liberados_7d || [])) { const li = el('div', 'linha-john'); li.append(el('b', null, (x.codigo || '') + ' — ' + x.titulo), el('span', 'dica', ` · liberado para ${x.squad} · ${x.estado}`)); d.appendChild(li) }
+  alvo.appendChild(d)
 }
 
 function desenharCaixa(modo) {
@@ -685,6 +708,7 @@ function desenharCaixa(modo) {
                : `${lista.length} item(ns) não começam até você decidir. As mais antigas primeiro.`;
   const alvo = $('lista-' + modo); alvo.replaceChildren();
   if (!ehAceite && PEDIDOS_CEO.length) desenharPedidosDoCeo(alvo);
+  if (!ehAceite) desenharComOJohn(alvo);
   // (M472/D6) o que já subiu e ainda não tem a ficha: você vê que existe, mas só decide com a ficha
   const prep = (((RETRATO.inbox && RETRATO.inbox.em_preparo) || {}).itens || []).filter((x) => (x.classe === 'entrega_aguarda_aceite') === ehAceite);
   if (prep.length) {

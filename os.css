@@ -845,3 +845,8 @@ button.lin:hover { background: var(--sup-3); }
 
 /* (29/09) a prévia da entrega é o 1º gesto do aceite: botão de verdade, separado do link do código */
 a.btn.previa { text-decoration: none; display: inline-flex; align-items: center; gap: .4rem; margin: 0 1rem .6rem 0; }
+
+/* (M644) a lista "Com o John" nas Aprovações */
+details.com-o-john { margin: 1rem 0; padding: .75rem 1rem; border: 1px solid var(--linha-2); border-radius: var(--raio-p, 8px); }
+details.com-o-john summary { cursor: pointer; font-weight: 600; }
+details.com-o-john .linha-john { padding: .35rem 0; border-top: 1px solid var(--linha); }
