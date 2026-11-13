@@ -32,5 +32,17 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/termos-valora",
+      "destination": "/termos-patrion",
+      "permanent": true
+    },
+    {
+      "source": "/termos-valora.html",
+      "destination": "/termos-patrion",
+      "permanent": true
+    }
   ]
 }

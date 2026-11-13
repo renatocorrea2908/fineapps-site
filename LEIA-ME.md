@@ -13,7 +13,9 @@ publicar.
 | `direitos.html` | Como exercer direitos de titular, com prazos e a quem dirigir cada pedido |
 | `seguranca.html` | Versão pública das práticas de segurança |
 | `termos-stratum.html` | Termos de Uso do Stratum |
-| `termos-valora.html` | Termos de Uso do Valora |
+| `termos-patrion.html` | Termos de Uso do Patrion |
+| `privacidade-be-your-hero.html` | Política de Privacidade do Be Your Hero (endereço usado nas lojas) |
+| `suporte.html` | Suporte dos aplicativos Be Your Hero e Plan2Travel (endereço usado nas lojas) |
 | `style.css` | Folha de estilo única |
 | `vercel.json` | Cabeçalhos de segurança HTTP |
 
