@@ -13,7 +13,7 @@ publicar.
 | `direitos.html` | Como exercer direitos de titular, com prazos e a quem dirigir cada pedido |
 | `seguranca.html` | Versão pública das práticas de segurança |
 | `termos-stratum.html` | Termos de Uso do Stratum |
-| `termos-valora.html` | Termos de Uso do Valora |
+| `termos-patrion.html` | Termos de Uso do Patrion |
 | `style.css` | Folha de estilo única |
 | `vercel.json` | Cabeçalhos de segurança HTTP |
 
